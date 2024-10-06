@@ -17,6 +17,7 @@ public class OrganizationUnit {
     private String orgName;
     private String orgDescription;
     private Boolean isActive;
+    private String parentOrgKey;
 
 
     private LocalDateTime createdAt;

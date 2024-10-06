@@ -32,12 +32,15 @@ public class OrganizationUnitEntity {
 
     @CreationTimestamp
     @Column(name = "create_date", updatable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createDate;
 
     @UpdateTimestamp
     @Column(name = "update_date")
-    private LocalDateTime updatedAt;
+    private LocalDateTime updateDate;
 
     @Column(name = "is_active")
-    private Boolean isActive = true;
+    private Boolean isActive;
+
+    @Column(name = "parent_org_key")
+    private String parentOrgKey;
 }

@@ -103,22 +103,6 @@ public class OrganizationUnitService {
         repository.save(entity);
     }
 
-    @Transactional
-    public void processCsvFile(MultipartFile file) throws IOException {
-        log.debug("Processing CSV file");
-        List<OrganizationUnit> organizationUnits = csvHelper.csvToOrganizationUnits(file.getInputStream());
-        for (OrganizationUnit ou : organizationUnits) {
-            repository.findByOrgKey(ou.getOrgKey())
-                    .ifPresentOrElse(
-                            entity -> {
-                                updateEntityFromDto(ou, entity);
-                                repository.save(entity);
-                            },
-                            () -> repository.save(mapToEntity(ou))
-                    );
-        }
-    }
-
     private OrganizationUnit mapToDto(OrganizationUnitEntity entity) {
         OrganizationUnit dto = new OrganizationUnit();
         dto.setOrgId(entity.getOrgId());
@@ -126,9 +110,10 @@ public class OrganizationUnitService {
         dto.setOrgKey(entity.getOrgKey());
         dto.setOrgName(entity.getOrgName());
         dto.setOrgDescription(entity.getOrgDescription());
+        dto.setParentOrgKey(entity.getParentOrgKey());
         dto.setIsActive(entity.getIsActive());
-        dto.setCreatedAt(entity.getCreatedAt());
-        dto.setUpdatedAt(entity.getUpdatedAt());
+        dto.setCreatedAt(entity.getCreateDate());
+        dto.setUpdatedAt(entity.getUpdateDate());
         return dto;
     }
 
@@ -138,6 +123,7 @@ public class OrganizationUnitService {
         entity.setOrgKey(dto.getOrgKey());
         entity.setOrgName(dto.getOrgName());
         entity.setOrgDescription(dto.getOrgDescription());
+        entity.setParentOrgKey(dto.getParentOrgKey());
         entity.setIsActive(dto.getIsActive());
         return entity;
     }
@@ -146,8 +132,31 @@ public class OrganizationUnitService {
         entity.setType(dto.getType());
         entity.setOrgName(dto.getOrgName());
         entity.setOrgDescription(dto.getOrgDescription());
+        entity.setParentOrgKey(dto.getParentOrgKey());
         if (dto.getIsActive() != null) {
             entity.setIsActive(dto.getIsActive());
+        }
+    }
+
+    @Transactional
+    public void processCsvFile(MultipartFile file) throws IOException {
+        log.debug("Processing CSV file");
+        List<OrganizationUnit> organizationUnits = csvHelper.csvToOrganizationUnits(file.getInputStream());
+        for (OrganizationUnit ou : organizationUnits) {
+            log.debug("Processing organization unit: {}", ou);
+            repository.findByOrgKey(ou.getOrgKey())
+                    .ifPresentOrElse(
+                            entity -> {
+                                updateEntityFromDto(ou, entity);
+                                OrganizationUnitEntity savedEntity = repository.save(entity);
+                                log.debug("Updated existing organization unit: {}", savedEntity);
+                            },
+                            () -> {
+                                OrganizationUnitEntity newEntity = mapToEntity(ou);
+                                OrganizationUnitEntity savedEntity = repository.save(newEntity);
+                                log.debug("Created new organization unit: {}", savedEntity);
+                            }
+                    );
         }
     }
 }

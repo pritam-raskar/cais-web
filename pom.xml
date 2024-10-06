@@ -1,83 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+        <!-- lookup parent from repository -->
+    </parent>
 
-	<parent>
-		<groupId>com.dair</groupId>
-		<artifactId>cais-web</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
-	</parent>
+    <groupId>com.dair</groupId>
+    <artifactId>cais-web</artifactId>
+    <packaging>pom</packaging>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>cais-web</name>
 
-	<artifactId>cais-alert-service</artifactId>
-	<packaging>jar</packaging>
+    <properties>
+        <springdoc-openapi.version>2.4.0</springdoc-openapi.version>
+        <java.version>21</java.version>
+        <javax.validation.version>2.0.1.Final</javax.validation.version>
+        <cais.base.version>0.0.1-SNAPSHOT</cais.base.version>
+        <spring.boot.starter.data.mongodb.version>3.2.0</spring.boot.starter.data.mongodb.version>
+        <postgresql.version>42.7.0</postgresql.version>
+    </properties>
 
-	<dependencies>
+    <modules>
+        <module>cais-base</module>
+        <module>cais-alert-service</module>
+        <module>cais-trade-service</module>
+        <module>cais-position-service</module>
+        <module>cais-auth-service</module>
+        <module>cais-report-service</module>
+    </modules>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
-		</dependency>
-
-		<!-- Example dependencies -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-mongodb</artifactId>
-			<version>${spring.boot.starter.data.mongodb.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<version>${postgresql.version}</version>
-		</dependency>
-	</dependencies>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
 </project>
-
-
-		<!--<?xml version="1.0" encoding="UTF-8"?>-->
-<!--<project xmlns="http://maven.apache.org/POM/4.0.0"-->
-<!--	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">-->
-<!--	<modelVersion>4.0.0</modelVersion>-->
-<!--	<parent>-->
-<!--		<groupId>org.springframework.boot</groupId>-->
-<!--		<artifactId>spring-boot-starter-parent</artifactId>-->
-<!--		<version>3.2.5</version>-->
-<!--		<relativePath/>-->
-<!--		&lt;!&ndash; lookup parent from repository &ndash;&gt;-->
-<!--	</parent>-->
-
-<!--	<groupId>com.dair</groupId>-->
-<!--	<artifactId>cais-web</artifactId>-->
-<!--	<packaging>pom</packaging>-->
-<!--	<version>0.0.1-SNAPSHOT</version>-->
-<!--	<name>cais-web</name>-->
-
-<!--	<properties>-->
-<!--		<springdoc-openapi.version>2.4.0</springdoc-openapi.version>-->
-<!--		<java.version>21</java.version>-->
-<!--		<javax.validation.version>2.0.1.Final</javax.validation.version>-->
-<!--		<cais.base.version>0.0.1-SNAPSHOT</cais.base.version>-->
-<!--		<spring.boot.starter.data.mongodb.version>3.2.0</spring.boot.starter.data.mongodb.version>-->
-<!--		<postgresql.version>42.7.0</postgresql.version>-->
-<!--	</properties>-->
-
-<!--	<modules>-->
-<!--		<module>cais-base</module>-->
-<!--		<module>cais-alert-service</module>-->
-<!--		<module>cais-trade-service</module>-->
-<!--		<module>cais-position-service</module>-->
-<!--		<module>cais-auth-service</module>-->
-<!--		<module>cais-report-service</module>-->
-<!--		<module>cais-user-service</module>-->
-<!--	</modules>-->
-
-<!--</project>-->

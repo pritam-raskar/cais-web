@@ -1,8 +1,0 @@
-com/dair/cais/CaisTradeApplication$WebConfig.class
-com/dair/cais/service/TradeService.class
-com/dair/cais/entity/TradeEntity.class
-com/dair/cais/controller/TradeController.class
-com/dair/cais/repository/TradeRepository.class
-com/dair/cais/mapper/TradeMapper.class
-com/dair/cais/CaisTradeApplication.class
-com/dair/cais/model/Trade.class

@@ -21,7 +21,6 @@ public class ModuleController {
     @GetMapping
     public ResponseEntity<List<ModuleEntity>> getAllModules() {
         log.info("Received request to get all modules");
-        // test
         List<ModuleEntity> modules = moduleService.getAllModules();
         return ResponseEntity.ok(modules);
     }

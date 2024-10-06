@@ -1,0 +1,14 @@
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: always
+---
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://caismgr:caismgr123@caismgr.aqvysok.mongodb.net/sample_airbnb?retryWrites=true&w=majority&appName=CaisMgr}
+#      database: ${MONGODB_DATABASE:sample_airbnb}
+      database: ${MONGODB_DATABASE:CAIS}
+      atlas:
+        search:
+          index: dynamic

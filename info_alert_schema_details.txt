@@ -1,0 +1,673 @@
+Following tables are available in schema "info_alert"
+
+"Table: advisors
+Columns:\n  - id (character varying(10) NOT NULL)
+  - years_of_experience (integer)
+  - fa_phone (character varying(20))
+  - fa_email (character varying(100))
+  - fa_address (character varying(200))
+  - branch (character varying(100))
+  - branch_address (character varying(200))
+  - licenses (character varying(100))
+  - allowed_states (character varying(200))
+  - name (character varying(100))
+  - age (integer)
+  - gender (character varying(10))
+  - specialization (character varying(100))
+Primary Key: id
+
+"
+"Table: alert_attachment
+Columns:\n  - file_type (character varying(50))
+  - file_data (bytea)
+  - create_date_time (timestamp without time zone)
+  - entity_type (character varying)
+  - entity_id (character varying)
+  - attachment_id (integer NOT NULL)
+  - file_name (character varying(255))
+  - file_size (bigint)
+Primary Key: attachment_id
+Sequences:\n  - attachment_id uses info_alert.alert_attachment_attachment_id_seq
+
+"
+"Table: alert_extension
+Columns:\n  - in_big_01 (bigint)
+  - in_big_02 (bigint)
+  - in_big_03 (bigint)
+  - in_big_04 (bigint)
+  - in_big_05 (bigint)
+  - in_big_06 (bigint)
+  - in_big_07 (bigint)
+  - in_big_08 (bigint)
+  - in_big_09 (bigint)
+  - in_big_10 (bigint)
+  - float_01 (numeric)
+  - float_02 (numeric)
+  - float_03 (numeric)
+  - float_04 (numeric)
+  - float_05 (numeric)
+  - float_07 (numeric)
+  - float_08 (numeric)
+  - float_09 (numeric)
+  - float_10 (numeric)
+  - num_small_01 (numeric)
+  - num_small_02 (numeric)
+  - num_small_03 (numeric)
+  - num_small_04 (numeric)
+  - num_small_05 (numeric)
+  - num_small_06 (numeric)
+  - num_small_07 (numeric)
+  - num_small_08 (numeric)
+  - num_small_09 (numeric)
+  - num_small_10 (numeric)
+  - num_big_01 (numeric)
+  - num_big_02 (numeric)
+  - num_big_03 (numeric)
+  - num_big_04 (numeric)
+  - num_big_05 (numeric)
+  - num_big_06 (numeric)
+  - num_big_07 (numeric)
+  - num_big_08 (numeric)
+  - num_big_09 (numeric)
+  - num_big_10 (numeric)
+  - real_01 (real)
+  - real_02 (real)
+  - real_03 (real)
+  - real_04 (real)
+  - real_05 (real)
+  - real_06 (real)
+  - real_07 (real)
+  - real_08 (real)
+  - real_09 (real)
+  - real_10 (real)
+  - double_01 (double precision)
+  - double_02 (double precision)
+  - double_03 (double precision)
+  - double_04 (double precision)
+  - double_05 (double precision)
+  - double_06 (double precision)
+  - double_07 (double precision)
+  - double_08 (double precision)
+  - double_09 (double precision)
+  - double_10 (double precision)
+  - str_50_01 (character varying(50))
+  - str_50_02 (character varying(50))
+  - str_50_03 (character varying(50))
+  - str_50_04 (character varying(50))
+  - str_50_05 (character varying(50))
+  - str_50_06 (character varying(50))
+  - str_50_07 (character varying(50))
+  - str_50_08 (character varying(50))
+  - str_50_09 (character varying(50))
+  - str_50_10 (character varying(50))
+  - str_500_01 (character varying(500))
+  - str_500_02 (character varying(500))
+  - str_500_03 (character varying(500))
+  - str_500_04 (character varying(500))
+  - str_500_05 (character varying(500))
+  - str_500_06 (character varying(500))
+  - str_500_07 (character varying(500))
+  - str_500_08 (character varying(500))
+  - str_500_09 (character varying(500))
+  - str_500_10 (character varying(500))
+  - str_4000_01 (character varying(4000))
+  - str_4000_02 (character varying(4000))
+  - str_4000_03 (character varying(4000))
+  - str_4000_04 (character varying(4000))
+  - str_4000_05 (character varying(4000))
+  - str_4000_06 (character varying(4000))
+  - str_4000_07 (character varying(4000))
+  - str_4000_08 (character varying(4000))
+  - str_4000_09 (character varying(4000))
+  - str_4000_10 (character varying(4000))
+  - str_unlimited_01 (text)
+  - str_unlimited_02 (text)
+  - str_unlimited_03 (text)
+  - str_unlimited_04 (text)
+  - str_unlimited_05 (text)
+  - str_unlimited_06 (text)
+  - str_unlimited_07 (text)
+  - str_unlimited_08 (text)
+  - str_unlimited_09 (text)
+  - str_unlimited_10 (text)
+  - bytea_01 (bytea)
+  - bytea_02 (bytea)
+  - bytea_03 (bytea)
+  - bytea_04 (bytea)
+  - bytea_05 (bytea)
+  - bytea_06 (bytea)
+  - bytea_07 (bytea)
+  - bytea_08 (bytea)
+  - bytea_09 (bytea)
+  - bytea_10 (bytea)
+  - bool_01 (boolean)
+  - bool_02 (boolean)
+  - bool_03 (boolean)
+  - bool_04 (boolean)
+  - bool_05 (boolean)
+  - bool_06 (boolean)
+  - bool_07 (boolean)
+  - bool_08 (boolean)
+  - bool_09 (boolean)
+  - bool_10 (boolean)
+  - dt_time_01 (timestamp without time zone)
+  - dt_time_02 (timestamp without time zone)
+  - dt_time_03 (timestamp without time zone)
+  - dt_time_04 (timestamp without time zone)
+  - dt_time_05 (timestamp without time zone)
+  - dt_time_06 (timestamp without time zone)
+  - dt_time_07 (timestamp without time zone)
+  - dt_time_08 (timestamp without time zone)
+  - dt_time_09 (timestamp without time zone)
+  - dt_time_10 (timestamp without time zone)
+  - dt_01 (date)
+  - dt_02 (date)
+  - dt_03 (date)
+  - dt_04 (date)
+  - dt_05 (date)
+  - dt_06 (date)
+  - dt_07 (date)
+  - dt_08 (date)
+  - dt_09 (date)
+  - dt_10 (date)
+  - alert_id (character varying(50))
+  - float_06 (numeric)
+  - int_small_01 (smallint)
+  - int_small_02 (smallint)
+  - int_small_03 (smallint)
+  - int_small_04 (smallint)
+  - int_small_05 (smallint)
+  - int_small_06 (smallint)
+  - int_small_07 (smallint)
+  - int_small_08 (smallint)
+  - int_small_09 (smallint)
+  - int_small_10 (smallint)
+  - int_medium_01 (integer)
+  - int_medium_02 (integer)
+  - int_medium_03 (integer)
+  - int_medium_04 (integer)
+  - int_medium_05 (integer)
+  - int_medium_06 (integer)
+  - int_medium_07 (integer)
+  - int_medium_08 (integer)
+  - int_medium_09 (integer)
+  - int_medium_10 (integer)
+
+"
+"Table: alerts
+Columns:\n  - alert_type_id (character varying(50))
+  - alert_id (character varying(50) NOT NULL)
+  - status_id (character varying(50))
+  - deleted (boolean)
+  - business_unit (character varying(50) NOT NULL)
+  - business_unit_family (character varying(500))
+  - business_unit_family_previous (character varying(500))
+  - owner_internal_id (character varying(50))
+  - fl_attachment (boolean)
+  - fl_read (boolean)
+  - details (text)
+  - score (integer)
+  - state (character varying(50))
+  - business_date (date)
+  - create_date (date)
+  - last_update_date (date)
+  - bu_id (integer)
+Primary Key: alert_id
+
+"
+"Table: audit_domain
+Columns:\n  - audit_domain_id (bigint NOT NULL)
+  - action_id (character varying)
+  - description (character varying)
+Primary Key: audit_domain_id
+Sequences:\n  - audit_domain_id uses info_alert.audit_domain_audit_domain_id_seq
+
+"
+"Table: cm_actions
+Columns:\n  - action_description (character varying(500))
+  - is_role_action (boolean)
+  - action_type (character varying(200))
+  - action_category (character varying(200))
+  - action_name (character varying(250))
+  - action_id (integer NOT NULL)
+Primary Key: action_id
+
+"
+"Table: cm_alert_communication
+Columns:\n  - type (character varying(255))
+  - alert_id (character varying(255))
+  - create_date (timestamp without time zone)
+  - user_id (character varying(255))
+  - attachment_id (character varying(255))
+  - has_attachment (boolean)
+  - message (text)
+  - id (integer NOT NULL)
+Primary Key: id
+Sequences:\n  - id uses info_alert.cm_alert_communication_id_seq
+
+"
+"Table: cm_alert_type
+Columns:\n  - updated_at (timestamp without time zone)
+  - type_slug (character varying(255) NOT NULL)
+  - type_name (character varying(255) NOT NULL)
+  - description (text)
+  - created_at (timestamp without time zone NOT NULL)
+  - alert_type_id (character varying(255) NOT NULL)
+  - aty_id (integer NOT NULL)
+Primary Key: aty_id
+
+"
+"Table: cm_assignment_type
+Columns:\n  - assignment_type_id (numeric NOT NULL)
+  - assignment_type_name (character varying)
+
+"
+"Table: cm_audit_trail
+Columns:\n  - category (character varying(100))
+  - audit_id (bigint NOT NULL)
+  - action_id (integer)
+  - user_id (bigint NOT NULL)
+  - user_role (character varying(100) NOT NULL)
+  - action_timestamp (timestamp with time zone)
+  - description (text)
+  - affected_item_type (character varying(100))
+  - affected_item_id (character varying(100))
+  - old_value (text)
+  - new_value (text)
+Primary Key: audit_id
+Foreign Keys:\n  - action_id REFERENCES cm_actions(action_id)
+
+"
+"Table: cm_connector
+Columns:\n  - accesskey (character varying)
+  - secretkey (character varying)
+  - name (character varying(255) NOT NULL)
+  - url (character varying(500) NOT NULL)
+  - username (character varying(100) NOT NULL)
+  - password (character varying(255) NOT NULL)
+  - driver_class_name (character varying(255) NOT NULL)
+  - region (character varying)
+  - bucket (character varying)
+  - connector_id (bigint NOT NULL)
+Primary Key: connector_id
+
+"
+"Table: cm_dashboards
+Columns:\n  - dashboard_name (character varying(255) NOT NULL)
+  - dashboard_id (integer NOT NULL)
+  - link (text)
+  - level (character varying(50))
+Primary Key: dashboard_id
+
+"
+"Table: cm_environment_config
+Columns:\n  - name (character varying(255) NOT NULL)
+  - description (character varying(2000))
+  - value (character varying)
+  - default_value (character varying(500))
+  - data_type (character varying(50))
+Primary Key: name
+
+"
+"Table: cm_hierarchy
+Columns:\n  - hierarchy_key (character varying(255) NOT NULL)
+  - hierarchy_id (integer NOT NULL)
+  - description (text)
+  - hierarchy_name (character varying(255) NOT NULL)
+  - is_active int NULL
+Primary Key: hierarchy_id
+Sequences:\n  - hierarchy_id uses info_alert.cm_hierarchy_hierarchy_id_seq
+
+"
+"Table: cm_modules
+Columns:\n  - level (integer)
+  - module_id (integer NOT NULL)
+  - parent_module_id (integer)
+  - module_name (character varying)
+Primary Key: module_id
+
+"
+"Table: cm_organization_family
+Columns:\n  - org_key (character varying(255) NOT NULL)
+  - family (character varying(255))
+  - parent_org_key (character varying(255))
+  - hierarchy_key (character varying(255) NOT NULL)
+  - org_family_id (integer NOT NULL)
+Primary Key: org_family_id
+Foreign Keys:\n  - hierarchy_key REFERENCES cm_hierarchy(hierarchy_key)
+  - org_key REFERENCES cm_organization_unit(org_key)
+Sequences:\n  - org_family_id uses info_alert.cm_organization_family_org_family_id_seq
+
+"
+"Table: cm_organization_unit
+Columns:\n  - updated_at (timestamp with time zone)
+  - org_description (text)
+  - org_name (character varying(255))
+  - org_id (integer NOT NULL)
+  - org_key (character varying(255) NOT NULL)
+  - type (character varying)
+  - created_at (timestamp with time zone)
+Sequences:\n  - org_id uses info_alert.business_units_bu_id_seq
+
+"
+"Table: cm_policy
+Columns:\n  - is_active (boolean NOT NULL)
+  - policy_id (integer NOT NULL)
+  - name (character varying(255) NOT NULL)
+  - description (text)
+  - type (character varying(50) NOT NULL)
+Primary Key: policy_id
+
+"
+"Table: cm_policy_alert_type_action_mapping
+Columns:\n  - condition (text)
+  - pata_id (integer NOT NULL)
+  - policy_id (integer NOT NULL)
+  - alert_type_id (character varying(50) NOT NULL)
+  - action_id (integer NOT NULL)
+Primary Key: pata_id
+Foreign Keys:\n  - policy_id REFERENCES cm_policy(policy_id)
+  - alert_type_id REFERENCES cm_alert_type(alert_type_id)
+  - action_id REFERENCES cm_actions(action_id)
+
+"
+"Table: cm_policy_dashboard_action_mapping
+Columns:\n  - dashboard_id (integer NOT NULL)
+  - pda_id (integer NOT NULL)
+  - condition (text)
+  - action_id (integer NOT NULL)
+  - policy_id (integer NOT NULL)
+Primary Key: pda_id
+Foreign Keys:\n  - action_id REFERENCES cm_actions(action_id)
+  - dashboard_id REFERENCES cm_dashboards(dashboard_id)
+  - policy_id REFERENCES cm_policy(policy_id)
+
+"
+"Table: cm_policy_module_action_mapping
+Columns:\n  - module_id (integer NOT NULL)
+  - condition (text)
+  - action_id (integer NOT NULL)
+  - policy_id (integer NOT NULL)
+  - pma_id (integer NOT NULL)
+Primary Key: pma_id
+Foreign Keys:\n  - action_id REFERENCES cm_actions(action_id)
+  - module_id REFERENCES cm_modules(module_id)
+  - policy_id REFERENCES cm_policy(policy_id)
+
+"
+"Table: cm_policy_report_action_mapping
+Columns:\n  - policy_id (integer NOT NULL)
+  - report_id (integer NOT NULL)
+  - action_id (integer NOT NULL)
+  - condition (text)
+  - pra_id (integer NOT NULL)
+Primary Key: pra_id
+Foreign Keys:\n  - action_id REFERENCES cm_actions(action_id)
+  - policy_id REFERENCES cm_policy(policy_id)
+  - report_id REFERENCES cm_reports(report_id)
+
+"
+"Table: cm_reports
+Columns:\n  - connector_id (integer NOT NULL)
+  - report_description (text)
+  - report_name (character varying(255) NOT NULL)
+  - report_id (integer NOT NULL)
+  - table_or_view_name (character varying(255))
+Primary Key: report_id
+Foreign Keys:\n  - connector_id REFERENCES cm_connector(connector_id)
+
+"
+"Table: cm_role_action_mapping
+Columns:\n  - entity_id (character varying(50))
+  - action_id (integer)
+  - role_id (integer)
+  - assigned_to (character varying(50))
+  - entity_type (character varying(50))
+  - entity_name (character varying(255))
+  - id (bigint NOT NULL)
+Sequences:\n  - id uses info_alert.cm_role_action_mapping_id_seq
+
+"
+"Table: cm_role_admin_module_mapping
+Columns:\n  - admin_configuration (character varying(255) NOT NULL)
+  - permission (boolean)
+  - role_id (integer NOT NULL)
+Primary Key: role_id, admin_configuration
+Foreign Keys:\n  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_role_alert_module_mapping
+Columns:\n  - alert_summary_view (character varying(255) NOT NULL)
+  - role_id (integer NOT NULL)
+  - permission (boolean)
+Primary Key: role_id, alert_summary_view
+Foreign Keys:\n  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_role_designer_module_mapping
+Columns:\n  - designer (character varying(255) NOT NULL)
+  - role_id (integer NOT NULL)
+  - permission (boolean)
+Primary Key: role_id, designer
+Foreign Keys:\n  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_role_module_mapping
+Columns:\n  - role_id (integer)
+  - module_id (integer)
+  - role_module_map_id (integer NOT NULL)
+Primary Key: role_module_map_id
+
+"
+"Table: cm_role_page_module_mapping
+Columns:\n  - cases (boolean)
+  - alerts (boolean)
+  - role_id (integer NOT NULL)
+  - designer (boolean)
+  - administrator (boolean)
+  - dashboard (boolean)
+Primary Key: role_id
+Foreign Keys:\n  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_roles
+Columns:\n  - role_identifier (character varying(255) NOT NULL)
+  - role_name (character varying(50))
+  - description (character varying)
+  - role_id (integer NOT NULL)
+Primary Key: role_id
+Sequences:\n  - role_id uses info_alert.cm_roles_new_column_name_seq
+
+"
+"Table: cm_roles_policy_mapping
+Columns:\n  - role_id (integer NOT NULL)
+  - rpm_id (integer NOT NULL)
+  - policy_id (integer NOT NULL)
+Primary Key: rpm_id
+Foreign Keys:\n  - policy_id REFERENCES cm_policy(policy_id)
+  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_step_status
+Columns:\n  - step_name (character varying)
+  - step_status_id (integer NOT NULL)
+Primary Key: step_status_id
+Sequences:\n  - step_status_id uses info_alert.cm_step_status_step_status_id_seq
+
+"
+"Table: cm_steps
+Columns:\n  - step_name (character varying)
+  - created_by (character varying)
+  - step_id (integer NOT NULL)
+  - updated_by (character varying)
+  - updated_date (timestamp without time zone)
+  - created_date (timestamp without time zone)
+  - description (text)
+  - step_status_id (integer)
+Primary Key: step_id
+Foreign Keys:\n  - step_status_id REFERENCES cm_step_status(step_status_id)
+Sequences:\n  - step_id uses info_alert.cm_steps_step_id_seq
+
+"
+"Table: cm_user_org_role_mapping
+Columns:\n  - user_id (character varying(255) NOT NULL)
+  - role_id (integer NOT NULL)
+  - orm_id (bigint NOT NULL)
+  - org_id (integer NOT NULL)
+Primary Key: orm_id
+Foreign Keys:\n  - user_id REFERENCES cm_users(user_id)
+  - org_id REFERENCES cm_organization_unit(org_id)
+  - role_id REFERENCES cm_roles(role_id)
+
+"
+"Table: cm_user_roles_mapping
+Columns:\n  - org_id (integer)
+  - user_id (integer)
+  - role_id (integer)
+  - user_role_map_id (integer NOT NULL)
+Primary Key: user_role_map_id
+Sequences:\n  - user_role_map_id uses info_alert.cm_user_roles_mapping_user_role_map_id_seq
+
+"
+"Table: cm_users
+Columns:\n  - user_id (character varying(255) NOT NULL)
+  - email (character varying(100))
+  - user_is_active (boolean)
+  - user_last_name (character varying(255))
+  - user_middle_name (character varying(255))
+  - user_first_name (character varying(50))
+  - user_login_password (character varying(255))
+  - user_login_name (character varying(255))
+Primary Key: user_id
+Sequences:\n  - user_id uses info_alert.cm_users_user__id_seq
+
+"
+"Table: cm_wf_step_mapping
+Columns:\n  - workflow_step_id (integer NOT NULL)
+  - position_number (integer)
+  - step_id (integer)
+  - workflow_id (integer)
+Primary Key: workflow_step_id
+Foreign Keys:\n  - workflow_id REFERENCES cm_workflow(workflow_id)
+  - step_id REFERENCES cm_steps(step_id)
+Sequences:\n  - workflow_step_id uses info_alert.cm_wf_step_mapping_workflow_step_id_seq
+
+"
+"Table: cm_wf_transition
+Columns:\n  - to_step_id (integer)
+  - workflow_id (integer)
+  - from_step_id (integer)
+  - direction (character varying)
+  - transition_id (integer NOT NULL)
+Primary Key: transition_id
+Foreign Keys:\n  - workflow_id REFERENCES cm_workflow(workflow_id)
+  - from_step_id REFERENCES cm_steps(step_id)
+  - to_step_id REFERENCES cm_steps(step_id)
+Sequences:\n  - transition_id uses info_alert.cm_wf_transition_transition_id_seq
+
+"
+"Table: cm_wf_transition_feature_map
+Columns:\n  - feature_id (integer)
+  - transition_id (integer)
+  - trans_feature_map_id (integer NOT NULL)
+Primary Key: trans_feature_map_id
+Foreign Keys:\n  - transition_id REFERENCES cm_wf_transition(transition_id)
+  - feature_id REFERENCES cm_wf_transition_features(feature_id)
+Sequences:\n  - trans_feature_map_id uses info_alert.cm_wf_transition_feature_map_trans_feature_map_id_seq
+
+"
+"Table: cm_wf_transition_features
+Columns:\n  - feature_name (character varying)
+  - feature_id (integer NOT NULL)
+  - createdby (character varying)
+Primary Key: feature_id
+Sequences:\n  - feature_id uses info_alert.cm_wf_transition_features_feature_id_seq
+
+"
+"Table: cm_workflow
+Columns:\n  - description (text)
+  - created_date (timestamp without time zone)
+  - updated_date (timestamp without time zone)
+  - updated_by (character varying)
+  - workflow_id (integer NOT NULL)
+  - workflow_name (character varying)
+  - created_by (character varying)
+Primary Key: workflow_id
+Sequences:\n  - workflow_id uses info_alert.cm_workflow_workflow_id_seq
+
+"
+"Table: note
+Columns:\n  - user_id (integer)
+  - alert_id (character varying)
+  - content (text)
+  - create_date (date)
+  - entity_id (character varying)
+  - entity_type (character varying)
+  - note_id (bigint NOT NULL)
+Primary Key: note_id
+Sequences:\n  - note_id uses info_alert.note_note_id_seq
+
+"
+"Table: positions
+Columns:\n  - base_curr_cd (character varying(3))
+  - key (integer NOT NULL)
+  - account_number (character varying(50))
+  - long_short_cd (character varying(1))
+  - position_date_time (date)
+  - product_key (integer)
+  - symbol (character varying(50))
+  - sector_cd (character varying(50))
+  - product_name (character varying(100))
+  - product (character varying(50))
+  - quantity (numeric)
+  - base_curr_value (numeric)
+  - base_curr_price (numeric)
+Primary Key: key
+
+"
+"Table: test
+Columns:\n  - column1 (character varying)
+
+"
+"Table: trades
+Columns:\n  - account_number (character varying(20))
+  - trade_key (character varying(20))
+  - instrument_quantity (numeric)
+  - product_key (character varying(20))
+  - orig_curr_commission (numeric)
+  - orig_curr_cd (character varying(5))
+  - orig_curr_amount (numeric)
+  - execution_local_date_time (timestamp without time zone)
+  - direction_cd (character varying(1))
+  - batch_date_time (date)
+  - base_curr_trade_price (numeric)
+  - base_curr_other_fees (character varying(50))
+  - base_curr_net_amount (numeric)
+  - base_curr_commission (numeric)
+  - base_curr_cd (character varying(5))
+  - base_curr_amount (numeric)
+  - quantity (numeric)
+  - settle_date (date)
+  - trade_id (numeric)
+
+"
+"Table: workflow_details
+Columns:\n  - workflow_step_id (integer)
+  - step_id (integer)
+  - transition_id (integer)
+  - from_step_id (integer)
+  - step_name (character varying)
+  - feature_name (character varying)
+  - to_step_name (character varying)
+  - from_step_name (character varying)
+  - feature_id (integer)
+  - direction (character varying)
+  - to_step_id (integer)
+  - step_status_name (character varying)
+  - step_status_id (integer)
+  - step_description (text)
+  - workflow_id (integer)
+  - workflow_name (character varying)
+  - workflow_description (text)
+
+"

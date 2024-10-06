@@ -1,0 +1,8 @@
+com/dair/cais/model/Position.class
+com/dair/cais/CaisPositionApplication.class
+com/dair/cais/repository/PositionRepository.class
+com/dair/cais/mapper/PositionMapper.class
+com/dair/cais/CaisPositionApplication$WebConfig.class
+com/dair/cais/controller/PositionController.class
+com/dair/cais/entity/PositionEntity.class
+com/dair/cais/service/PositionService.class

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cais-position-service
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: cais-position-service
+  template:
+    metadata:
+      labels:
+        component: cais-position-service
+    spec:
+      containers:
+        - name: cais-position-service
+          image: lifeavi19/dair-cais-position-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: AWS_BUCKET
+              value: www.dair.cloud/img
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: headless-cms-secret
+                  key: AWS_ACCESS_KEY_ID
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cais-position-service-svc
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+spec:
+  type: NodePort
+  selector:
+    component: cais-position-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cais-position-svc-ing
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: apisix
+    k8s.apisix.apache.org/upstream-scheme: http
+spec:
+  tls:
+  - hosts:
+    - cais-api.dair.cloud
+    secretName: cais-api-ssl
+  rules:
+  - host: cais-api.dair.cloud
+    http:
+      paths:
+      - path: /positions
+        pathType: Prefix
+        backend:
+          service:
+            name: cais-position-service-svc
+            port:
+              number: 80

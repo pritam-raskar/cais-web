@@ -1,0 +1,35 @@
+server:
+  port: ${PORT:8081}
+  error:
+    include-message: always
+
+spring:
+  # PostgreSQL Configuration
+  datasource:
+    url: jdbc:postgresql://headless-cms-db.cluster-cudjfioirmo2.us-east-1.rds.amazonaws.com:5432/case_manager
+    username: postgres
+    password: headless-cms-db
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: info_alert
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  # MongoDB Configuration
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://cmpadmin:MyCmpPasswd@caiscluster01.k3frl5v.mongodb.net/CMP_DB}
+      database: ${MONGODB_DATABASE:CMP_DB}
+  mongodb:
+    atlas:
+      search:
+        index: dynamic
+
+  logging:
+    level:
+      root: INFO
+      com.dair.cais: DEBUG
+      org.springframework: WARN

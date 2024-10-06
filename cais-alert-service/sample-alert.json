@@ -1,0 +1,137 @@
+{
+  "name": "Trade_Review_00001",
+  "type": "Trade_Review",
+  "status": "In Progress",
+  "deleted": false,
+  "businessUnit": "436B2B",
+  "businessUnitFamily": "[Firm:US:West Regon:Branch2]",
+  "businessUnitFamilyPrevious": "[Firm:US:East Regon:Branch1]",
+  "details": "Mutual Fund liquidated by client ABC before maturity. ",
+  "score": 92.0,
+  "state": "Closed",
+  "businessDate": "2024-01-01",
+  "createdDate": "2021-07-21",
+  "updatedDate": "2023-08-09",
+  "focusDetails": {
+    "Focus": [
+      {
+        "Focus_Type": "Mutual Fund Short-Term Liquidation",
+        "Focus_Name": "Mutual Fund Short-Term Liquidation",
+        "Focus_Description": "An early liquidation of a mutual fund has occurred outside the guidelines.",
+        "Total_Score": 200,
+        "Scenarios": [
+          {
+            "Scenario_Id": "SC001",
+            "Scenario_Name": "Mutual Fund Short-Term Liquidation - Share Class B",
+            "Scenario_Description": "An early liquidation of a mutual fund has occurred and the client has incurred a CDSC",
+            "Threshold_Value": 80,
+            "Actual_Value": 90,
+            "Score": 100
+          },
+          {
+            "Scenario_Id": "SC002",
+            "Scenario_Name": "Mutual Fund Short-Term Liquidation - Share Class C",
+            "Scenario_Description": "An early liquidation of a mutual fund has occurred in C shares and the client has incurred a CDSC",
+            "Threshold_Value": 80,
+            "Actual_Value": 90,
+            "Score": 100
+          }
+        ]
+      },
+      {
+        "Focus_Type": "Suspicious Trading Activity",
+        "Focus_Name": "Suspicious Trading Activity",
+        "Focus_Description": "Unusual trading patterns or transactions suggesting potential market abuse, manipulation, or insider trading, deviating from standard market practices",
+        "Total_Score": 225,
+        "Scenarios": [
+          {
+            "Scenario_Id": "SC004",
+            "Scenario_Name": "Abnormal Price Movements",
+            "Scenario_Description": "Sudden and significant price movements in a security with no apparent news or fundamental reason, potentially indicating market manipulation or insider trading.",
+            "Threshold_Value": 10,
+            "Actual_Value": 8,
+            "Score": 80
+          },
+          {
+            "Scenario_Id": "SC005",
+            "Scenario_Name": "Front-Running",
+            "Scenario_Description": "A trader executes orders on a security based on advanced knowledge of pending trades from a client, typically to benefit from the anticipated price movement, which is illegal and unethical.",
+            "Threshold_Value": 4,
+            "Actual_Value": 3,
+            "Score": 70
+          },
+          {
+            "Scenario_Id": "SC006",
+            "Scenario_Name": "Insider Trading",
+            "Scenario_Description": "Trading in a security based on material, non-public information about the security, in violation of securities laws.",
+            "Threshold_Value": 5,
+            "Actual_Value": 3,
+            "Score": 75
+          }
+        ]
+      }
+    ]
+  },
+  "customFields": {
+    "extra_fields": {
+      "Is_Centralized": true,
+      "Is_Whitelist": false,
+      "Customer_Info": {
+        "Customer_Id": "C123",
+        "Name": "John Doe",
+        "Address": "123 Main St",
+        "City": "New York",
+        "State": "NY",
+        "Zip": "10001",
+        "Phone_Number": "555-123-4567",
+        "Email": "john.doe@example.com",
+        "Date_of_Birth": "1970-01-01",
+        "Nationality": "American"
+      },
+      "Account_Suitability_Info": {
+        "Account_Type": "Checking",
+        "Risk_Tolerance": "Medium",
+        "Investment_Goals": "Retirement",
+        "Investment_Time_Horizon": "Long-term",
+        "Investment Strategy": "Aggressive Growth"
+      },
+      "Account_Information": {
+        "Account_Number": "987654321",
+        "Account_Opened_Date": "2022-01-01",
+        "Account_Balance": 100000.00,
+        "State": "California",
+        "Branch": "Los Angeles"
+      },
+      "Trade_Information": {
+        "Trade_ID": "TRADE123",
+        "Trade_Date": "2024-03-24",
+        "Trade_Execution_Date": "2024-03-24",
+        "Trade_Type": "Buy",
+        "Symbol": "AAPL",
+        "Quantity": 100,
+        "Price": 150.00,
+        "Total_Amount": 15000.00,
+        "Trade_Status": "Executed",
+        "Direction": "In",
+        "Order_ID": "ORDER456",
+        "Order_Date": "2024-03-24",
+        "Order_Placed_By": "John Doe",
+        "Is_Solicited": true,
+        "Is_Descriptive": false,
+        "Product_Name": "Apple Inc.",
+        "Product_Symbol": "AAPL",
+        "CUSIP": "037833100",
+        "Commission": 10.00,
+        "Fee": 5.00,
+        "Focal_Entity": "ABC Corp",
+        "Focus": "Growth",
+        "Advisor_Id": "AD123",
+        "Advisor_Name": "Jane Smith"
+      },
+      "Advisor_Information": {
+        "Advisor_Id": "AD123",
+        "Advisor_Name": "Jane Smith"
+      }
+    }
+  }
+}

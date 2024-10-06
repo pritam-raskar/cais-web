@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cais-position-service
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: cais-position-service
+  template:
+    metadata:
+      labels:
+        component: cais-position-service
+    spec:
+      containers:
+        - name: cais-position-service
+          image: lifeavi19/dair-cais-position-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: AWS_BUCKET
+              value: www.dair.cloud/img
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: headless-cms-secret
+                  key: AWS_ACCESS_KEY_ID
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cais-position-service-svc
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+spec:
+  type: NodePort
+  selector:
+    component: cais-position-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cais-position-service
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-position-service
+  annotations:
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: cais-position-service-sbx
+    #kubernetes.io/ingress.class: "alb" (OLD INGRESS CLASS NOTATION - STILL WORKS BUT RECOMMENDED TO USE IngressClass Resource) # Additional Notes: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.3/guide/ingress/ingress_class/#deprecated-kubernetesioingressclass-annotation
+    # Ingress Core Settings
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Health Check Settings
+    #alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    #alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html
+    #alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    #alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    #alb.ingress.kubernetes.io/success-codes: '200'
+    #alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    #alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+spec:
+  ingressClassName: alb # Ingress Class
+  defaultBackend:
+    service:
+      name: cais-position-service-svc
+      port:
+        number: 80

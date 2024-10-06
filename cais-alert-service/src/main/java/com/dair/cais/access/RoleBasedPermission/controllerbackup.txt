@@ -1,0 +1,145 @@
+package com.dair.cais.access.RoleBasedPermission;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/permissions")
+public class RolePolicyDocumentController {
+
+    @Autowired
+    private RolePolicyDocumentService rolePolicyDocumentService;
+
+    @GetMapping("/user/{userId}/tabular")
+    public ResponseEntity<List<Map<String, String>>> getTabularDataForUser(@PathVariable String userId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/user/{userId}/csv")
+    public ResponseEntity<String> getCsvData(@PathVariable String userId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        String csv = rolePolicyDocumentService.convertToCsv(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename={userId}.csv")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(csv);
+    }
+
+    @GetMapping("/user/{userId}/yaml")
+    public ResponseEntity<String> getYamlData(@PathVariable String userId) throws Exception {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        String yaml = rolePolicyDocumentService.convertToYaml(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename={roleId}.yaml")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(yaml);
+    }
+
+    @GetMapping("/role/{roleId}/tabular")
+    public ResponseEntity<List<Map<String, String>>> getTabularData(@PathVariable Integer roleId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/role/{roleId}/csv")
+    public ResponseEntity<String> getCsvData(@PathVariable Integer roleId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        String csv = rolePolicyDocumentService.convertToCsv(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename={roleId}.csv")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(csv);
+    }
+
+    @GetMapping("/role/{roleId}/yaml")
+    public ResponseEntity<String> getYamlData(@PathVariable Integer roleId) throws Exception {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        String yaml = rolePolicyDocumentService.convertToYaml(data);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename={roleId}.yaml")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(yaml);
+    }
+
+    @PostMapping("/user/{userId}/save-tabular")
+    public ResponseEntity<String> saveTabularDataForUser(@PathVariable String userId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        rolePolicyDocumentService.saveUserTabularDataToMongo(userId, data);
+        return ResponseEntity.ok("Tabular data saved to MongoDB for user: " + userId);
+    }
+
+    @PostMapping("/user/{userId}/save-csv")
+    public ResponseEntity<String> saveCsvDataForUser(@PathVariable String userId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        String csv = rolePolicyDocumentService.convertToCsv(data);
+        rolePolicyDocumentService.saveUserCsvToMongo(userId, csv);
+        return ResponseEntity.ok("CSV data saved to MongoDB for user: " + userId);
+    }
+
+    @PostMapping("/user/{userId}/save-yaml")
+    public ResponseEntity<String> saveYamlDataForUser(@PathVariable String userId) throws Exception {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForUser(userId);
+        String yaml = rolePolicyDocumentService.convertToYaml(data);
+        rolePolicyDocumentService.saveUserYamlToMongo(userId, yaml);
+        return ResponseEntity.ok("YAML data saved to MongoDB for user: " + userId);
+    }
+
+
+    @PostMapping("/role/{roleId}/save-tabular")
+    public ResponseEntity<String> saveTabularDataForRole(@PathVariable Integer roleId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        rolePolicyDocumentService.saveRoleTabularDataToMongo(roleId, data);
+        return ResponseEntity.ok("Tabular data saved to MongoDB for Role: " + roleId);
+    }
+
+    @PostMapping("/role/{roleId}/save-csv")
+    public ResponseEntity<String> saveCsvDataForUser(@PathVariable Integer roleId) {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        String csv = rolePolicyDocumentService.convertToCsv(data);
+        rolePolicyDocumentService.saveRoleCsvToMongo(roleId, csv);
+        return ResponseEntity.ok("CSV data saved to MongoDB for Role: " + roleId);
+    }
+
+    @PostMapping("/role/{roleId}/save-yaml")
+    public ResponseEntity<String> saveYamlDataForUser(@PathVariable Integer roleId) throws Exception {
+        List<Map<String, String>> data = rolePolicyDocumentService.generateTabularDataForRole(roleId);
+        String yaml = rolePolicyDocumentService.convertToYaml(data);
+        rolePolicyDocumentService.saveRoleYamlToMongo(roleId, yaml);
+        return ResponseEntity.ok("YAML data saved to MongoDB for Role: " + roleId);
+    }
+
+    @GetMapping("/generate-and-save/{roleId}")
+    public ResponseEntity<RolePolicyDocument> generateAndSaveRolePolicyDocument(@PathVariable Integer roleId) {
+        RolePolicyDocument document = rolePolicyDocumentService.generateAndSaveDocumentForRoleId(roleId);
+        return ResponseEntity.ok(document);
+    }
+
+    @GetMapping("/generate-and-save-as-document-bulk")
+    public ResponseEntity<List<RolePolicyDocument>> generateAndSaveRolePolicyDocuments(@RequestParam List<Integer> roleIds) {
+        List<RolePolicyDocument> documents = rolePolicyDocumentService.generateAndSaveDocumentsForRoleIds(roleIds);
+        return ResponseEntity.ok(documents);
+    }
+
+
+
+
+    @GetMapping("/get-from-document/{roleId}")
+    public ResponseEntity<RolePolicyDocument> getRolePolicyDocument(@PathVariable Integer roleId) {
+        RolePolicyDocument document = rolePolicyDocumentService.getDocumentForRoleId(roleId);
+        if (document != null) {
+            return ResponseEntity.ok(document);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+
+
+}

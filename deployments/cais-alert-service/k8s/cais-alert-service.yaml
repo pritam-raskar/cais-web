@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cais-alert-service
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-alert-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: cais-alert-service
+  template:
+    metadata:
+      labels:
+        component: cais-alert-service
+    spec:
+      containers:
+        - name: cais-alert-service
+          image: lifeavi19/dair-cais-alert-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: AWS_BUCKET
+              value: www.dair.cloud/img
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: headless-cms-secret
+                  key: AWS_ACCESS_KEY_ID
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cais-alert-service-svc
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-alert-service
+spec:
+  type: NodePort
+  selector:
+    component: cais-alert-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cais-alerts-svc-ing
+  namespace: headless-cms-sandbox
+  labels:
+    component: cais-alert-service
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: apisix
+    k8s.apisix.apache.org/upstream-scheme: http
+spec:
+  tls:
+  - hosts:
+    - cais-api.dair.cloud
+    secretName: cais-api-ssl
+  rules:
+  - host: cais-api.dair.cloud
+    http:
+      paths:
+      - path: /alerts
+        pathType: Prefix
+        backend:
+          service:
+            name: cais-alert-service-svc
+            port:
+              number: 80
+      - path: /types
+        pathType: Prefix
+        backend:
+          service:
+            name: cais-alert-service-svc
+            port:
+              number: 80              

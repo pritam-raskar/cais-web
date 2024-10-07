@@ -7,4 +7,5 @@ import java.util.List;
 @Repository
 public interface PolicyAlertTypeActionMappingRepository extends JpaRepository<PolicyAlertTypeActionMappingEntity, Integer> {
     List<PolicyAlertTypeActionMappingEntity> findByPolicyPolicyId(Integer policyId);
+    List<PolicyAlertTypeActionMappingEntity> findByPolicyPolicyIdIn(List<Integer> policyIds);
 }

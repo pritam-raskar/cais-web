@@ -99,6 +99,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/note/NoteEntity.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/audit/AuditTrailEntity.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/RolePolicyMapping/RolesPolicyMappingRepository.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/AlertServiceWithAudit.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/audit/AuditTrailMapper.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/enrichment/EnrichAlertDataController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/CaisAlertApplication.java
@@ -127,6 +128,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/reason/AlertTransitionReasonService.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/modules/ModuleService.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/audit/AuditTrailController.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/AlertControllerWithAudit.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyModuleMapping/PolicyModuleMappingController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/checklist/AlertStepChecklistController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/note/NoteService.java

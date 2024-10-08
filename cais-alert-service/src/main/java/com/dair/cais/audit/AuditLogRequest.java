@@ -1,6 +1,6 @@
 package com.dair.cais.audit;
 
-class AuditLogRequest {
+public class AuditLogRequest {
     private Long userId;
     private String userRole;
     private Integer actionId;

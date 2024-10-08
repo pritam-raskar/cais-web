@@ -44,13 +44,47 @@ public class PolicyAlertTypeActionMappingService {
     @Transactional
     public List<PolicyAlertTypeActionMapping> createMappings(List<PolicyAlertTypeActionMapping> mappings) {
         log.debug("Creating {} new mappings", mappings.size());
+        List<PolicyAlertTypeActionMappingEntity> entities = new ArrayList<>();
 
-        List<PolicyAlertTypeActionMappingEntity> entities = mappings.stream()
-                .map(mappingMapper::toEntity)
-                .collect(Collectors.toList());
+        Map<Integer, PolicyEntity> policyCache = policyRepository.findAllById(mappings.stream()
+                        .map(PolicyAlertTypeActionMapping::getPolicyId)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(PolicyEntity::getPolicyId, Function.identity()));
+
+        Map<String, alertTypeEntity> alertTypeCache = mappings.stream()
+                .map(PolicyAlertTypeActionMapping::getAlertTypeId)
+                .distinct()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        alertTypeId -> alertTypeRepository.findByAlertTypeId(alertTypeId)
+                                .orElseThrow(() -> new CaisNotFoundException("AlertType not found with ID: " + alertTypeId))
+                ));
+
+        Map<Integer, ActionEntity> actionCache = actionRepository.findAllById(mappings.stream()
+                        .map(PolicyAlertTypeActionMapping::getActionId)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(ActionEntity::getActionId, Function.identity()));
+
+        for (PolicyAlertTypeActionMapping mapping : mappings) {
+            PolicyEntity policy = policyCache.get(mapping.getPolicyId());
+            alertTypeEntity alertType = alertTypeCache.get(mapping.getAlertTypeId());
+            ActionEntity action = actionCache.get(mapping.getActionId());
+
+            if (policy == null || alertType == null || action == null) {
+                throw new CaisNotFoundException("One or more related entities not found");
+            }
+
+            PolicyAlertTypeActionMappingEntity entity = new PolicyAlertTypeActionMappingEntity();
+            entity.setPolicy(policy);
+            entity.setAlertType(alertType);
+            entity.setAction(action);
+            entity.setCondition(mapping.getCondition());
+            entities.add(entity);
+        }
 
         List<PolicyAlertTypeActionMappingEntity> savedEntities = mappingRepository.saveAll(entities);
-
         log.info("Created {} new mappings", savedEntities.size());
         return savedEntities.stream()
                 .map(mappingMapper::toModel)

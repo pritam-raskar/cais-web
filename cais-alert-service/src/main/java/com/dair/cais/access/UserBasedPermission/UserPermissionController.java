@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/permissions")
@@ -64,6 +66,45 @@ public class UserPermissionController {
             }
         } catch (Exception e) {
             log.error("Error occurred while retrieving structured data for role with ID: {}", userId, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/user/org-ids/{userId}")
+    @Operation(summary = "Get distinct org IDs for a user")
+    public ResponseEntity<List<String>> getDistinctOrgIdsForUser(@PathVariable String userId) {
+        log.info("Received request to get distinct org IDs for user with ID: {}", userId);
+        try {
+            List<String> orgIds = userPermissionService.getDistinctOrgIdsForUser(userId);
+            if (!orgIds.isEmpty()) {
+                log.info("Successfully retrieved distinct org IDs for user with ID: {}", userId);
+                return ResponseEntity.ok(orgIds);
+            } else {
+                log.warn("No org IDs found for user with ID: {}", userId);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while retrieving distinct org IDs for user with ID: {}", userId, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+
+    @GetMapping("/user/org-keys/{userId}")
+    @Operation(summary = "Get distinct org Keys for a user")
+    public ResponseEntity<List<String>> getDistinctOrgKeysForUser(@PathVariable String userId) {
+        log.info("Received request to get distinct org IDs for user with ID: {}", userId);
+        try {
+            List<String> orgKeys = userPermissionService.getDistinctOrgKeysForUser(userId);
+            if (!orgKeys.isEmpty()) {
+                log.info("Successfully retrieved distinct org IDs for user with ID: {}", userId);
+                return ResponseEntity.ok(orgKeys);
+            } else {
+                log.warn("No org IDs found for user with ID: {}", userId);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while retrieving distinct org IDs for user with ID: {}", userId, e);
             return ResponseEntity.internalServerError().build();
         }
     }

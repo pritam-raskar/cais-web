@@ -2,10 +2,15 @@ package com.dair.cais.alert;
 
 import com.dair.cais.common.config.CaisAlertConstants;
 import com.dair.exception.CaisBaseException;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperationContext;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -13,10 +18,7 @@ import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,14 +28,67 @@ public class AlertRepository {
     @Autowired
     private MongoTemplate mongoTemplate;
 
+
+    public List<AlertEntity> findAllActiveAndNonDeletedAlerts() {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("isDeleted").is(false));
+        query.addCriteria(Criteria.where("isActive").is(true));
+
+        return mongoTemplate.find(query, AlertEntity.class, CaisAlertConstants.ALERTS);
+    }
+
     public List<AlertEntity> findAlertsByOrgFamily(String substring) {
         // Define the query criteria
         Query query = new Query();
         query.addCriteria(Criteria.where("orgFamily").regex(substring, "i"));
+        query.addCriteria(Criteria.where("isDeleted").is(false));
+        query.addCriteria(Criteria.where("isActive").is(true));
 
         // Execute the query and return the results
         return mongoTemplate.find(query, AlertEntity.class, CaisAlertConstants.ALERTS);
     }
+
+
+    public List<AlertEntity> findAlertsByOrgFamilyBYUserOrgKeys(List<String> orgKeys) {
+        AggregationOperation matchActiveNonDeleted = Aggregation.match(
+                Criteria.where("isDeleted").is(false).and("isActive").is(true)
+        );
+
+        AggregationOperation splitOrgFamily = new AggregationOperation() {
+            @Override
+            public Document toDocument(AggregationOperationContext context) {
+                return new Document("$addFields",
+                        new Document("orgFamilyTokens",
+                                new Document("$split", Arrays.asList("$orgFamily", ":"))
+                        )
+                );
+            }
+        };
+
+        AggregationOperation matchOrgKeys = Aggregation.match(
+                new Criteria().orOperator(
+                        Criteria.where("orgFamilyTokens").in(orgKeys),
+                        Criteria.where("orgFamily").in(orgKeys)
+                )
+        );
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                matchActiveNonDeleted,
+                splitOrgFamily,
+                matchOrgKeys
+        );
+
+        AggregationResults<AlertEntity> results = mongoTemplate.aggregate(
+                aggregation,
+                CaisAlertConstants.ALERTS,
+                AlertEntity.class
+        );
+
+        return results.getMappedResults();
+    }
+
+
+
 
 
     public List<AlertEntity> findAlertsByOrg(String substring) {
@@ -45,9 +100,12 @@ public class AlertRepository {
         return mongoTemplate.find(query_org, AlertEntity.class, CaisAlertConstants.ALERTS);
     }
 
+
     public AlertEntity insertAlert(AlertEntity alertEntity) {
         return mongoTemplate.save(alertEntity, CaisAlertConstants.ALERTS);
     }
+
+
 
     public List<AlertEntity> findAlertsByCriteria(
             String alertId, String createDate, String lastUpdateDate, String totalScore,
@@ -246,7 +304,7 @@ public class AlertRepository {
         return alertEntity;
     }
 
-    public AlertEntity getAlertOnId(String alertId) {
+    public AlertEntity  getAlertOnId(String alertId) {
         // Define the collection name, assuming it's fixed
         String collectionName = "alerts";
 
@@ -254,6 +312,9 @@ public class AlertRepository {
         Query query = new Query();
 //        query.addCriteria(Criteria.where("alertId").is(alertId));
         query.addCriteria(Criteria.where("alertId").is(alertId));
+        query.addCriteria(Criteria.where("isDeleted").is(false));
+        query.addCriteria(Criteria.where("isActive").is(true));
+
 
         // Use findOne to execute the query
         AlertEntity alertEntity = mongoTemplate.findOne(query, AlertEntity.class, collectionName);

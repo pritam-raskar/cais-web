@@ -35,5 +35,7 @@ public class UserEntity {
     @Column(name = "email")
     private String email;
 
+
+
     // Getters and setters
 }

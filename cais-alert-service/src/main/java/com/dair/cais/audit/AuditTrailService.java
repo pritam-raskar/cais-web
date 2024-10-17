@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AuditTrailService {
@@ -41,6 +42,14 @@ public class AuditTrailService {
     public List<AuditTrail> getAuditTrailByItem(String itemType, String itemId) {
         List<AuditTrailEntity> entities = auditTrailRepository.findByAffectedItemTypeAndAffectedItemId(itemType, itemId);
         return auditTrailMapper.entitiesToDtos(entities);
+    }
+
+    public List<String> getAuditTrailStepHistory( String itemId, Integer actionId) {
+        List<AuditTrailEntity> entities = auditTrailRepository.findAuditTrailStepHistory( itemId , actionId);
+        List<String> newValues = entities.stream()
+                .map(AuditTrailEntity::getNewValue)
+                .collect(Collectors.toList());
+        return newValues;
     }
 
     @Transactional

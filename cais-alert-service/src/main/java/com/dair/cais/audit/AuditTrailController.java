@@ -48,4 +48,13 @@ public class AuditTrailController {
         List<AuditTrail> auditTrails = auditTrailService.getAuditTrailByItem(itemType, itemId);
         return ResponseEntity.ok(auditTrails);
     }
+
+    @GetMapping("/item/stephistory")
+    public ResponseEntity<List<String>> getAuditTrailStepHistory(
+
+            @RequestParam String itemId,
+            @RequestParam Integer actionId) {
+        List<String> auditTrails = auditTrailService.getAuditTrailStepHistory( itemId, actionId);
+        return ResponseEntity.ok(auditTrails);
+    }
 }

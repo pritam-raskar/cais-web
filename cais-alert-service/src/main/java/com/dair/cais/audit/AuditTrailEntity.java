@@ -7,11 +7,12 @@ import java.time.ZonedDateTime;
 
 @Entity
 @Data
-@Table(name = "cm_audit_trail")
+@Table(name = "cm_audit_trail" , schema = "info_alert")
 public class AuditTrailEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "cm_common_sequence")
-    @SequenceGenerator(name = "cm_common_sequence", sequenceName = "cm_common_sequence", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "cm_audit_sequence")
+    @SequenceGenerator(name = "cm_audit_sequence", sequenceName = "cm_audit_sequence", allocationSize = 1, schema = "info_alert")
+    @Column(name = "audit_id")
     private Long auditId;
 
     @ManyToOne

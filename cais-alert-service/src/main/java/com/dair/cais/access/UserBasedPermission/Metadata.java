@@ -10,4 +10,6 @@ import java.util.Set;
 public class Metadata {
     private Set<String> uniqueAlertTypesOrgId;
     private Set<String> uniqueOrgId;
+//    private Map<String, String> orgIdToKeyMap;
+    private Set<String> distinctOrgKeys;
 }

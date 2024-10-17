@@ -1,5 +1,7 @@
 package com.dair.cais.type;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -7,14 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 import javax.validation.Valid;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
+import java.util.*;
 
 @RestController
 @RequestMapping("/types")
@@ -63,9 +60,14 @@ public class AlertTypeController {
          List<Map<String, Object>> mandatoryFields = mapper.readValue(alertTypeExtended.getMandatory_fields(),
                  new TypeReference<List<Map<String, Object>>>(){});
 
-         // Combine the two lists
+         // Wrap field_schema under "customFields"
+         Map<String, Object> customFieldsWrapper = new HashMap<>();
+         customFieldsWrapper.put("customFields", mapper.readValue(alertTypeExtended.getField_schema(),
+                 new TypeReference<List<Map<String, Object>>>(){}));
+
+         // Combine the mandatory_fields with the customFields
          List<Map<String, Object>> combinedFields = new ArrayList<>(mandatoryFields);
-         combinedFields.addAll(fieldSchema);
+         combinedFields.add(customFieldsWrapper);
 
          // Create a new map with the combined fields
          Map<String, Object> result = Map.of(

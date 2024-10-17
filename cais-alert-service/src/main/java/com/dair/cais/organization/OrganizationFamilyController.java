@@ -68,7 +68,7 @@ public class OrganizationFamilyController {
             content = @Content(schema = @Schema(implementation = Page.class)))
     public ResponseEntity<Page<OrganizationFamily>> getAllOrganizationFamilies(
             @Parameter(description = "Pageable parameters")
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 200000) Pageable pageable) {
         log.info("Received request to get all organization families");
         Page<OrganizationFamily> families = organizationFamilyService.getAllOrganizationFamilies(pageable);
         return ResponseEntity.ok(families);

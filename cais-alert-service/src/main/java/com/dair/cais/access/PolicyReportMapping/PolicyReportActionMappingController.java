@@ -2,11 +2,9 @@ package com.dair.cais.access.PolicyReportMapping;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 @Slf4j
@@ -32,27 +30,44 @@ public class PolicyReportActionMappingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public ResponseEntity<PolicyReportActionMapping> createMapping(@Valid @RequestBody PolicyReportActionMapping mapping) {
-        log.info("Received request to create a new policy report action mapping");
-        PolicyReportActionMapping createdMapping = mappingService.createMapping(mapping);
-        return new ResponseEntity<>(createdMapping, HttpStatus.CREATED);
+    @PostMapping("/batch")
+    public ResponseEntity<List<PolicyReportActionMapping>> createOrUpdateMappings(@RequestBody List<PolicyReportActionMapping> mappings) {
+        log.info("Received request to create or update {} mappings", mappings.size());
+
+        List<PolicyReportActionMapping> resultMappings = mappingService.createOrUpdateMappings(mappings);
+
+        log.info("Created or updated {} mappings", resultMappings.size());
+
+        if (resultMappings.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.ok(resultMappings);
+        }
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<PolicyReportActionMapping> updateMapping(@PathVariable Integer id, @Valid @RequestBody PolicyReportActionMapping mapping) {
-        log.info("Received request to update policy report action mapping with id: {}", id);
-        return mappingService.updateMapping(id, mapping)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
+    @DeleteMapping("/policy/{policyId}")
+    public ResponseEntity<Void> deleteMappingsByPolicyId(@PathVariable Integer policyId) {
+        log.info("Received request to delete mappings for policyId: {}", policyId);
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMapping(@PathVariable Integer id) {
-        log.info("Received request to delete policy report action mapping with id: {}", id);
-        mappingService.deleteMapping(id);
+        mappingService.deleteMappingsByPolicyId(policyId);
+
+        log.info("Deleted mappings for policyId: {}", policyId);
+
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/policies")
+    public ResponseEntity<Void> deleteMappingsByPolicyIds(@RequestBody List<Integer> policyIds) {
+        log.info("Received request to delete mappings for {} policyIds", policyIds.size());
+
+        mappingService.deleteMappingsByPolicyIds(policyIds);
+
+        log.info("Deleted mappings for {} policyIds", policyIds.size());
+
+        return ResponseEntity.noContent().build();
+    }
+
+
 
     @GetMapping("/policy/{policyId}")
     public ResponseEntity<List<PolicyReportActionMapping>> getMappingsByPolicyId(@PathVariable Integer policyId) {

@@ -23,6 +23,14 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(RoleDeleteException.class)
+    public ResponseEntity<Map<String, String>> handleRoleInUseException(RoleDeleteException ex) {
+        log.error("Role in use: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         log.error("Validation error: {}", ex.getMessage());

@@ -8,4 +8,5 @@ import java.util.Optional;
 @Repository
 public interface alertTypeRepository1 extends JpaRepository<alertTypeEntity, Integer> {
     Optional<alertTypeEntity> findByAlertTypeId(String alertTypeId);
+
 }

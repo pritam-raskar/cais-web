@@ -3,11 +3,9 @@ package com.dair.cais.access.PolicyModuleMapping;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 @Slf4j
@@ -33,28 +31,44 @@ public class PolicyModuleMappingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public ResponseEntity<PolicyModuleMapping> createMapping(@Valid @RequestBody PolicyModuleMapping mapping) {
-        log.info("Received request to create a new policy module mapping");
-        PolicyModuleMapping createdMapping = policyModuleMappingService.createMapping(mapping);
-        return new ResponseEntity<>(createdMapping, HttpStatus.CREATED);
+
+    @PostMapping("/create")
+    public ResponseEntity<List<PolicyModuleMapping>> createOrUpdateMappings(@RequestBody List<PolicyModuleMapping> mappings) {
+        log.info("Received request to create or update {} mappings", mappings.size());
+
+        List<PolicyModuleMapping> resultMappings = policyModuleMappingService.createOrUpdateMappings(mappings);
+
+        log.info("Created or updated {} mappings", resultMappings.size());
+
+        if (resultMappings.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.ok(resultMappings);
+        }
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<PolicyModuleMapping> updateMapping(@PathVariable Integer id, @Valid @RequestBody PolicyModuleMapping mapping) {
-        log.info("Received request to update policy module mapping with id: {}", id);
-        return policyModuleMappingService.updateMapping(id, mapping)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMapping(@PathVariable Integer id) {
-        log.info("Received request to delete policy module mapping with id: {}", id);
-        policyModuleMappingService.deleteMapping(id);
+    @DeleteMapping("/delete-policies-module-mapping/{policyId}")
+    public ResponseEntity<Void> deleteMappingsByPolicyId(@PathVariable Integer policyId) {
+        log.info("Received request to delete mappings for policyId: {}", policyId);
+
+        policyModuleMappingService.deleteMappingsByPolicyId(policyId);
+
+        log.info("Deleted mappings for policyId: {}", policyId);
+
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/delete-policies-module-mapping")
+    public ResponseEntity<Void> deleteMappingsByPolicyIds(@RequestBody List<Integer> policyIds) {
+        log.info("Received request to delete mappings for {} policyIds", policyIds.size());
+
+        policyModuleMappingService.deleteMappingsByPolicyIds(policyIds);
+
+        log.info("Deleted mappings for {} policyIds", policyIds.size());
+
+        return ResponseEntity.noContent().build();
+    }
     @GetMapping("/policy/{policyId}")
     public ResponseEntity<List<PolicyModuleMapping>> getMappingsByPolicyId(@PathVariable Integer policyId) {
         log.info("Received request to get policy module mappings for policy id: {}", policyId);

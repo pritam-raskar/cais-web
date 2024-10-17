@@ -7,4 +7,6 @@ import java.util.Map;
 @Data
 public class AlertTypeOrgPermissions {
     private Map<String, OrgActions> orgId;
+
+
 }

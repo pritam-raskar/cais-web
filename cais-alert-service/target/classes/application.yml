@@ -33,3 +33,22 @@ spring:
       root: INFO
       com.dair.cais: DEBUG
       org.springframework: WARN
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+storage:
+  type: ${STORAGE_TYPE:local}
+  location: ${STORAGE_LOCATION:/tmp/storage}
+  s3:
+    bucket-name: ${S3_BUCKET_NAME:your-bucket-name}
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:us-east-1}
+      stack:
+        auto: false
+

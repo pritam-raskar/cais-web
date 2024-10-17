@@ -12,7 +12,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/modules")
+@RequestMapping("/modules")
 @RequiredArgsConstructor
 public class ModuleController {
 

@@ -8,9 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -96,6 +94,38 @@ public class FileAttachementServiceWithAudit {
         }
 
         return attachments;
+    }
+
+    public Map<String, FileAttachment> uploadAttachmentForMultipleAlertsWithAudit(
+            MultipartFile file, List<String> alertIds, String createdBy, String comment, AuditLogRequest auditLogRequest) throws IOException {
+        Map<String, FileAttachment> result = new HashMap<>();
+
+        for (String alertId : alertIds) {
+            // Create a new AuditLogRequest for each alert
+            AuditLogRequest alertAuditRequest = new AuditLogRequest(auditLogRequest);
+            alertAuditRequest.setAffectedItemId(alertId);
+
+            FileAttachment attachment = uploadAttachmentWithAudit(file, alertId, createdBy, comment, alertAuditRequest);
+            result.put(alertId, attachment);
+        }
+
+        return result;
+    }
+
+    public Map<String, List<FileAttachment>> uploadMultipleAttachmentsForMultipleAlertsWithAudit(
+            List<MultipartFile> files, List<String> alertIds, String createdBy, String comment, AuditLogRequest auditLogRequest) throws IOException {
+        Map<String, List<FileAttachment>> result = new HashMap<>();
+
+        for (String alertId : alertIds) {
+            // Create a new AuditLogRequest for each alert
+            AuditLogRequest alertAuditRequest = new AuditLogRequest(auditLogRequest);
+            alertAuditRequest.setAffectedItemId(alertId);
+
+            List<FileAttachment> attachments = uploadMultipleAttachmentsWithAudit(files, alertId, createdBy, comment, alertAuditRequest);
+            result.put(alertId, attachments);
+        }
+
+        return result;
     }
 
     public List<FileAttachment> getAttachmentsByAlertIdWithAudit(String alertId, AuditLogRequest auditLogRequest) {

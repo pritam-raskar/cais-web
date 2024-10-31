@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/file-attachment")
@@ -68,6 +69,40 @@ public class FileAttachmentController {
                                                                     @RequestParam("comment") String comment) throws IOException {
         List<FileAttachment> attachments = attachmentService.uploadMultipleAttachments(files, alertId, createdBy, comment);
         return new ResponseEntity<>(attachments, HttpStatus.OK);
+    }
+
+    @PostMapping(value = "/upload-multi-alerts-audit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, FileAttachment>> uploadAttachmentForMultipleAlertsWithAudit(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("alertIds") List<String> alertIds,
+            @RequestParam("createdBy") String createdBy,
+            @RequestParam("comment") String comment,
+            @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+        Map<String, FileAttachment> result = attachmentServiceWithAudit.uploadAttachmentForMultipleAlertsWithAudit(
+                file, alertIds, createdBy, comment, auditLogRequest);
+
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    @PostMapping(value = "/upload-multiple-files-multi-alerts-audit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, List<FileAttachment>>> uploadMultipleAttachmentsForMultipleAlertsWithAudit(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam("alertIds") List<String> alertIds,
+            @RequestParam("createdBy") String createdBy,
+            @RequestParam("comment") String comment,
+            @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+        Map<String, List<FileAttachment>> result = attachmentServiceWithAudit.uploadMultipleAttachmentsForMultipleAlertsWithAudit(
+                files, alertIds, createdBy, comment, auditLogRequest);
+
+        return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
     @PostMapping("/uploadMultipleFiles-audit")

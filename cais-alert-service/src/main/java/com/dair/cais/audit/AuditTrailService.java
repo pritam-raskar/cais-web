@@ -44,8 +44,8 @@ public class AuditTrailService {
         return auditTrailMapper.entitiesToDtos(entities);
     }
 
-    public List<String> getAuditTrailStepHistory( String itemId) {
-        List<AuditTrailEntity> entities = auditTrailRepository.findAuditTrailStepHistory( itemId);
+    public List<String> getAuditTrailStepHistory( String itemId, Integer actionId) {
+        List<AuditTrailEntity> entities = auditTrailRepository.findAuditTrailStepHistory( itemId , actionId);
         List<String> newValues = entities.stream()
                 .map(AuditTrailEntity::getNewValue)
                 .collect(Collectors.toList());

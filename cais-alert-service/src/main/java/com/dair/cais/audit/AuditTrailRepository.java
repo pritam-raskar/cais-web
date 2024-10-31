@@ -14,8 +14,9 @@ public interface AuditTrailRepository extends JpaRepository<AuditTrailEntity, Lo
     List<AuditTrailEntity> findByAffectedItemTypeAndAffectedItemId(String affectedItemType, String affectedItemId);
 
 
-    @Query("SELECT a FROM AuditTrailEntity a JOIN a.action act WHERE act.actionName = 'Change Step' AND a.affectedItemId = :affectedItemId ORDER BY a.actionTimestamp DESC")
-    List<AuditTrailEntity> findAuditTrailStepHistory(@Param("affectedItemId") String affectedItemId);
+    @Query("SELECT a FROM AuditTrailEntity a WHERE a.action.actionId = :actionId AND a.affectedItemId = :affectedItemId ORDER BY a.actionTimestamp DESC")
+    List<AuditTrailEntity> findAuditTrailStepHistory(@Param("affectedItemId") String affectedItemId,
+                                                     @Param("actionId") Integer action);
 
 
 }

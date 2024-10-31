@@ -17,6 +17,17 @@ public class UserPermissionController {
 
     private final UserPermissionService userPermissionService;
 
+    @PostMapping("/refresh/{userId}")
+    public ResponseEntity<String> refreshPermissions(@PathVariable String userId) {
+        try {
+            userPermissionService.refreshUserPermissions(userId);
+            return ResponseEntity.ok("Permissions refreshed successfully");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body("Failed to refresh permissions: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/user/{userId}")
     @Operation(summary = "Prepare User permission from RDBMS ")
     public ResponseEntity<UserPermissionDto> getStructuredDataForUser(@PathVariable String userId) {

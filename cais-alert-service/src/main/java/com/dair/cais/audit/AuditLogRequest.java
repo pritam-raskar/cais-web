@@ -11,6 +11,9 @@ public class AuditLogRequest {
     private String oldValue;
     private String newValue;
 
+    public AuditLogRequest(AuditLogRequest auditLogRequest) {
+    }
+
     // Getters and setters
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

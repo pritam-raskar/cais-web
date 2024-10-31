@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.FindAndReplaceOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -48,7 +49,32 @@ public class UserPermissionService {
     private final OrganizationUnitRepository organizationUnitRepository;
     private final ObjectMapper objectMapper;
     private final MongoTemplate mongoTemplate;
+    private final CacheManager cacheManager;
 
+
+    @Transactional
+    public void refreshUserPermissions(String userId) {
+        log.info("Refreshing permissions for user: {}", userId);
+        // Generate new permissions
+        UserPermissionDto newPermissions = generateStructuredDataForUser(userId);
+
+        // Save to MongoDB
+        saveUserPermissionToMongo(userId, newPermissions);
+
+        // Clear all caches for this user
+        evictUserCaches(userId);
+
+        log.info("Successfully refreshed permissions for user: {}", userId);
+    }
+
+    private void evictUserCaches(String userId) {
+        log.debug("Evicting caches for user: {}", userId);
+        cacheManager.getCache("userPermissions").evict(userId);
+        cacheManager.getCache("userOrgUnits").evict(userId);
+        cacheManager.getCache("userOrgKeys").evict(userId);
+    }
+
+    @Transactional
     public void saveUserPermissionToMongo(String userId, UserPermissionDto userPermissionDto) {
         Query query = new Query(Criteria.where("userId").is(userId));
         FindAndReplaceOptions options = new FindAndReplaceOptions().upsert();
@@ -61,6 +87,9 @@ public class UserPermissionService {
                 CaisAlertConstants.USER_PERMISSION_DATA,
                 UserPermissionDto.class
         );
+
+        // Evict caches after updating MongoDB
+        evictUserCaches(userId);
 
         if (result != null) {
             log.info("Updated existing user permissions in MongoDB for user ID: {}", userId);

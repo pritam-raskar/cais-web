@@ -1,7 +1,6 @@
 package com.dair.cais.access.user;
 
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,15 +21,17 @@ public class AuthenticationController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         return authenticationService.authenticate(loginRequest.getUserLoginName(), loginRequest.getPassword())
-                .map(userId -> {
+                .map(loginResponse -> {
                     try {
-                        ObjectNode permissions = userPermissionService.getUserPermissionFromMongo(userId);
-                        LoginResponseDto response = new LoginResponseDto();
-                        response.setUserId(Integer.valueOf(userId));
-                        response.setPermissions(permissions);
-                        return ResponseEntity.ok(response);
+                        loginResponse.setPermissions(
+                                userPermissionService.getUserPermissionFromMongo(
+                                        String.valueOf(loginResponse.getUserId())
+                                )
+                        );
+                        return ResponseEntity.ok(loginResponse);
                     } catch (Exception e) {
-                        return ResponseEntity.internalServerError().body("Error processing permissions: " + e.getMessage());
+                        return ResponseEntity.internalServerError()
+                                .body("Error processing permissions: " + e.getMessage());
                     }
                 })
                 .orElse(ResponseEntity.badRequest().body("Invalid credentials"));

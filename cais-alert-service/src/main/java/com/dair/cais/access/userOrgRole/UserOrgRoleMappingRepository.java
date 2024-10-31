@@ -18,4 +18,6 @@ public interface UserOrgRoleMappingRepository extends JpaRepository<UserOrgRoleM
 
     @Query("SELECT DISTINCT m.user FROM UserOrgRoleMappingEntity m WHERE m.role = :role")
     List<UserEntity> findUsersByRole(RoleEntity role);
+
+    List<UserOrgRoleMappingEntity> findByRoleRoleId(Integer roleId);
 }

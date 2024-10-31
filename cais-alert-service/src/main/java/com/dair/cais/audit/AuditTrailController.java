@@ -9,7 +9,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/audit")
+@RequestMapping("/api/audit")
 public class AuditTrailController {
 
     @Autowired
@@ -51,8 +51,10 @@ public class AuditTrailController {
 
     @GetMapping("/item/stephistory")
     public ResponseEntity<List<String>> getAuditTrailStepHistory(
-            @RequestParam String itemId) {
-        List<String> auditTrails = auditTrailService.getAuditTrailStepHistory( itemId);
+
+            @RequestParam String itemId,
+            @RequestParam Integer actionId) {
+        List<String> auditTrails = auditTrailService.getAuditTrailStepHistory( itemId, actionId);
         return ResponseEntity.ok(auditTrails);
     }
 }

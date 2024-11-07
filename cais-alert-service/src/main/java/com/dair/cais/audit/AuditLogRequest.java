@@ -1,5 +1,16 @@
 package com.dair.cais.audit;
 
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor  // This is crucial for Jackson deserialization
+@AllArgsConstructor
+
 public class AuditLogRequest {
     private Long userId;
     private String userRole;

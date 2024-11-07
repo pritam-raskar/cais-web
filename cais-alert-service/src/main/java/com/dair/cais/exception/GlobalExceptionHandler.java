@@ -1,13 +1,13 @@
 package com.dair.cais.exception;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-import jakarta.persistence.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,28 +23,28 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler(RoleDeleteException.class)
-    public ResponseEntity<Map<String, String>> handleRoleInUseException(RoleDeleteException ex) {
-        log.error("Role in use: {}", ex.getMessage());
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidDataAccessApiUsageException(InvalidDataAccessApiUsageException ex) {
+        log.error("Data access error: {}", ex.getMessage());
         Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
+        String message = ex.getMessage();
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        log.error("Validation error: {}", ex.getMessage());
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-                errors.put(error.getField(), error.getDefaultMessage()));
-        return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
-    }
+        // Handle enum conversion errors
+        if (message != null && message.contains("No enum constant")) {
+            message = "Invalid connection type value in database. Please contact system administrator.";
+        }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneralExceptions(Exception ex) {
-        log.error("An unexpected error occurred: ", ex);
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", "An unexpected error occurred. Please try again later.");
+        errorResponse.put("error", message);
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalStateException(IllegalStateException ex) {
+        log.error("Illegal state error: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", "An error occurred while processing the connection type. Please contact system administrator.");
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    // ... (rest of the exception handlers remain the same)
 }

@@ -1,5 +1,9 @@
 package com.dair.cais.access.RolePolicyMapping;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Slf4j
 @RequestMapping("/roles-policy-mappings")
 public class RolesPolicyMappingController {
     private static final Logger logger = LoggerFactory.getLogger(RolesPolicyMappingController.class);
@@ -44,6 +49,32 @@ public class RolesPolicyMappingController {
         List<RolesPolicyMapping> mappings = service.getMappingsByRoleId(roleId);
         return ResponseEntity.ok(mappings);
     }
+
+    @PostMapping("/create")
+    @Operation(summary = "Create or update multiple role-policy mappings")
+    public ResponseEntity<List<RolesPolicyMapping>> bulkCreateOrUpdate(
+            @RequestBody List<RolesPolicyMapping> requests) {
+        log.info("Received request to bulk create/update {} role-policy mappings", requests.size());
+        List<RolesPolicyMapping> mappings = service.bulkCreateOrUpdate(requests);
+        return ResponseEntity.ok(mappings);
+    }
+
+    @DeleteMapping("/role/{roleId}/policies")
+    @Operation(summary = "Delete policy mappings for a role")
+    @ApiResponse(responseCode = "204", description = "Mappings successfully deleted")
+    @ApiResponse(responseCode = "404", description = "Role not found")
+    public ResponseEntity<Void> deletePolicyMappingsForRole(
+            @Parameter(description = "Role ID", required = true)
+            @PathVariable Integer roleId,
+            @Parameter(description = "List of Policy IDs to delete", required = true)
+            @RequestBody List<Integer> policyIds) {
+        log.info("Received request to delete policy mappings for role: {} with policies: {}",
+                roleId, policyIds);
+        service.deletePolicyMappingsForRole(roleId, policyIds);
+        return ResponseEntity.noContent().build();
+    }
+
+
 
     @PostMapping
     public ResponseEntity<RolesPolicyMapping> createMapping(@RequestParam Integer policyId, @RequestParam Integer roleId) {

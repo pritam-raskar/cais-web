@@ -3,6 +3,9 @@ package com.dair.cais.access.user;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
@@ -11,6 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class JwtService {
 
     private final JwtConfig jwtConfig;
@@ -41,5 +45,27 @@ public class JwtService {
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    public TokenValidationResult validateAndExtractClaims(String token) {
+        try {
+            Claims claims = validateToken(token);
+            return new TokenValidationResult(
+                    true,
+                    claims.get("userId", String.class),
+                    claims.get("username", String.class)
+            );
+        } catch (Exception e) {
+            log.error("Token validation failed: {}", e.getMessage());
+            return new TokenValidationResult(false, null, null);
+        }
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class TokenValidationResult {
+        private boolean valid;
+        private String userId;
+        private String username;
     }
 }

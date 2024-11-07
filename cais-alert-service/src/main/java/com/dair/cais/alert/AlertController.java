@@ -1,9 +1,11 @@
 package com.dair.cais.alert;
 
+import com.dair.cais.audit.AuditLogRequest;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,44 +18,82 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/alerts")
-@Tag(name = "alerts")
-
+@Tag(name = "Alert Management", description = "APIs for managing alerts")
+@RequiredArgsConstructor
+@Slf4j
 public class AlertController {
-    @Autowired
-    private AlertService alertService;
+    private final AlertService alertService;
 
-    @PostMapping("/insert")
-    @Operation(summary = "Create an alert with alert data payload and alert type")
-    public ResponseEntity<AlertEntity> insertAlert(
-            @RequestParam String alertType,
-            @RequestBody AlertEntity alertEntity) {
-        AlertEntity createdAlert = alertService.insertAlert(alertType, alertEntity);
-        return ResponseEntity.ok().body(createdAlert);
+    @GetMapping("/active")
+    @Operation(summary = "Get all active alerts")
+    public ResponseEntity<List<Alert>> getAllActiveAlerts() {
+        log.debug("Request received to get all active alerts");
+        return ResponseEntity.ok(alertService.getAllActiveAlerts());
     }
+
+    @GetMapping("/audit/active")
+    @Operation(summary = "Get all active alerts with audit")
+    public ResponseEntity<List<Alert>> getAllActiveAlertsWithAudit(
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to get all active alerts with audit");
+        return ResponseEntity.ok(alertService.getAllActiveAlertsWithAudit(auditLogRequest));
+    }
+
+
 
     @GetMapping("/alertId/{alertId}")
-    @Operation(summary = "Get an alertId using the alert field alertId")
+    @Operation(summary = "Get an alert by its alert ID")
     public ResponseEntity<Alert> getAlertById(@PathVariable final String alertId) {
-        Alert alertById = alertService.getAlertOnId(alertId);
-        return ResponseEntity.ok().body(alertById);
+        log.debug("Request received to get alert by ID: {}", alertId);
+        return ResponseEntity.ok(alertService.getAlertOnId(alertId));
     }
 
+    @GetMapping("/audit/alertId/{alertId}")
+    @Operation(summary = "Get an alert by its alert ID with audit")
+    public ResponseEntity<Alert> getAlertByIdWithAudit(
+            @PathVariable final String alertId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to get alert by ID: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.getAlertOnId(alertId, auditLogRequest));
+    }
 
     @GetMapping("/findAlertsByOrgFamily")
-    @Operation(summary = "Get alerts from orgFamily")
-    public List<AlertEntity> findAlertsByOrgFamily(@RequestParam("org") String substring) {
-        return alertService.findAlertsByOrgFamily(substring);
+    @Operation(summary = "Get alerts by organization family")
+    public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamily(
+            @RequestParam("org") String searchString) {
+        log.debug("Request received to find alerts by org family: {}", searchString);
+        return ResponseEntity.ok(alertService.findAlertsByOrgFamily(searchString));
+    }
+
+    @GetMapping("/audit/findAlertsByOrgFamily")
+    @Operation(summary = "Get alerts by organization family with audit")
+    public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyWithAudit(
+            @RequestParam("org") String searchString,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to find alerts by org family: {} with audit", searchString);
+        return ResponseEntity.ok(alertService.findAlertsByOrgFamilyWithAudit(searchString, auditLogRequest));
     }
 
     @GetMapping("/findAlertsByOrg")
-    @Operation(summary = "Get alerts from orgId")
-    public List<AlertEntity> findAlertsByOrg(@RequestParam("org") String substring) {
-        return alertService.findAlertsByOrg(substring);
+    @Operation(summary = "Get alerts by organization")
+    public ResponseEntity<List<AlertEntity>> findAlertsByOrg(
+            @RequestParam("org") String searchString) {
+        log.debug("Request received to find alerts by org: {}", searchString);
+        return ResponseEntity.ok(alertService.findAlertsByOrg(searchString));
+    }
+
+    @GetMapping("/audit/findAlertsByOrg")
+    @Operation(summary = "Get alerts by organization with audit")
+    public ResponseEntity<List<AlertEntity>> findAlertsByOrgWithAudit(
+            @RequestParam("org") String searchString,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to find alerts by org: {} with audit", searchString);
+        return ResponseEntity.ok(alertService.findAlertsByOrgWithAudit(searchString, auditLogRequest));
     }
 
     @GetMapping("/find")
-    @Operation(summary = "Mandatory/base level field filters to fetch the list of alerts")
-    public List<AlertEntity> findAlertsByCriteria(
+    @Operation(summary = "Find alerts by multiple criteria")
+    public ResponseEntity<List<AlertEntity>> findAlertsByCriteria(
             @RequestParam(required = false) String alertId,
             @RequestParam(required = false) String createDate,
             @RequestParam(required = false) String lastUpdateDate,
@@ -79,50 +119,127 @@ public class AlertController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String alertStepId,
             @RequestParam(required = false) String alertStepName,
-            @RequestParam(required = false) Boolean isCaseCreated
-    ) {
-        return alertService.findAlertsByCriteria(
+            @RequestParam(required = false) Boolean isCaseCreated) {
+        log.debug("Request received to find alerts by criteria");
+        return ResponseEntity.ok(alertService.findAlertsByCriteria(
                 alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate,
                 focalEntity, focus, alertTypeId, alertRegion, alertGroupId, isConsolidated,
                 isActive, hasMultipleScenario, isDeleted, orgUnitId, orgFamily, previousOrgUnitId,
-                isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId, alertStepName, isCaseCreated
-        );
+                isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId,
+                alertStepName, isCaseCreated));
     }
 
-    @PatchMapping("/changescore")
-    public ResponseEntity<Alert> updateTotalScore(@PathVariable String alertId, @RequestParam int totalScore) {
-        Alert updatedAlert = alertService.updateTotalScore(alertId, totalScore);
-        return ResponseEntity.ok().body(updatedAlert);
+//    @GetMapping("/audit/find")
+//    @Operation(summary = "Find alerts by multiple criteria with audit")
+//    public ResponseEntity<List<AlertEntity>> findAlertsByCriteriaWithAudit(
+//            // Same parameters as above
+//            @RequestBody AuditLogRequest auditLogRequest) {
+//        log.debug("Request received to find alerts by criteria with audit");
+//        return ResponseEntity.ok(alertService.findAlertsByCriteriaWithAudit(
+//                alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate,
+//                focalEntity, focus, alertTypeId, alertRegion, alertGroupId, isConsolidated,
+//                isActive, hasMultipleScenario, isDeleted, orgUnitId, orgFamily, previousOrgUnitId,
+//                isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId,
+//                alertStepName, isCaseCreated, auditLogRequest));
+//    }
+
+    @PatchMapping("/changescore/{alertId}")
+    @Operation(summary = "Update alert total score")
+    public ResponseEntity<Alert> updateTotalScore(
+            @PathVariable String alertId,
+            @RequestParam int totalScore) {
+        log.debug("Request received to update total score for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.updateTotalScore(alertId, totalScore));
     }
 
-
-    @PatchMapping("/changeowner")
-    public ResponseEntity<Alert> updateOwnerId(@PathVariable String alertId, @RequestParam String ownerId) {
-        Alert updatedAlert = alertService.updateOwnerId(alertId, ownerId);
-        return ResponseEntity.ok().body(updatedAlert);
+    @PatchMapping("/audit/changescore/{alertId}")
+    @Operation(summary = "Update alert total score with audit")
+    public ResponseEntity<Alert> updateTotalScoreWithAudit(
+            @PathVariable String alertId,
+            @RequestParam int totalScore,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to update total score for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.updateTotalScoreWithAudit(alertId, totalScore, auditLogRequest));
     }
 
-    @PatchMapping("/changeorg")
-    public ResponseEntity<Alert> updateOrgUnitId(@PathVariable String alertId, @RequestParam String orgUnitId) {
-        Alert updatedAlert = alertService.updateOrgUnitId(alertId, orgUnitId);
-        return ResponseEntity.ok().body(updatedAlert);
+    @PatchMapping("/changeowner/{alertId}")
+    @Operation(summary = "Update alert owner")
+    public ResponseEntity<Alert> updateOwnerId(
+            @PathVariable String alertId,
+            @RequestParam String ownerId) {
+        log.debug("Request received to update owner for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.updateOwnerId(alertId, ownerId));
     }
 
-    @PatchMapping("/changestatus")
-    public ResponseEntity<Alert> updateStatus(@PathVariable String alertId, @RequestParam String statusId) {
-        Alert updatedAlert = alertService.updateStatus(alertId, statusId);
-        return ResponseEntity.ok().body(updatedAlert);
+    @PatchMapping("/audit/changeowner/{alertId}")
+    @Operation(summary = "Update alert owner with audit")
+    public ResponseEntity<Alert> updateOwnerIdWithAudit(
+            @PathVariable String alertId,
+            @RequestParam String ownerId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to update owner for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.updateOwnerIdWithAudit(alertId, ownerId, auditLogRequest));
+    }
+
+    @PatchMapping("/changeorg/{alertId}")
+    @Operation(summary = "Update alert organization")
+    public ResponseEntity<Alert> updateOrgUnitId(
+            @PathVariable String alertId,
+            @RequestParam String orgUnitId) {
+        log.debug("Request received to update org unit for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.updateOrgUnitId(alertId, orgUnitId));
+    }
+
+    @PatchMapping("/audit/changeorg/{alertId}")
+    @Operation(summary = "Update alert organization with audit")
+    public ResponseEntity<Alert> updateOrgUnitIdWithAudit(
+            @PathVariable String alertId,
+            @RequestParam String orgUnitId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to update org unit for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.updateOrgUnitIdWithAudit(alertId, orgUnitId, auditLogRequest));
+    }
+
+    @PatchMapping("/changestatus/{alertId}")
+    @Operation(summary = "Update alert status")
+    public ResponseEntity<Alert> updateStatus(
+            @PathVariable String alertId,
+            @RequestParam String statusId) {
+        log.debug("Request received to update status for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.updateStatus(alertId, statusId));
+    }
+
+    @PatchMapping("/audit/changestatus/{alertId}")
+    @Operation(summary = "Update alert status with audit")
+    public ResponseEntity<Alert> updateStatusWithAudit(
+            @PathVariable String alertId,
+            @RequestParam String statusId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to update status for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.updateStatusWithAudit(alertId, statusId, auditLogRequest));
     }
 
     @PatchMapping("/changestep/{alertId}")
-    public ResponseEntity<Alert> changeStep(@PathVariable String alertId, @RequestParam Long stepId) {
-        Alert updatedAlert = alertService.changeStep(alertId, stepId);
-        return ResponseEntity.ok(updatedAlert);
+    @Operation(summary = "Change alert step")
+    public ResponseEntity<Alert> changeStep(
+            @PathVariable String alertId,
+            @RequestParam Long stepId) {
+        log.debug("Request received to change step for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.changeStep(alertId, stepId));
     }
 
+    @PatchMapping("/audit/changestep/{alertId}")
+    @Operation(summary = "Change alert step with audit")
+    public ResponseEntity<Alert> changeStepWithAudit(
+            @PathVariable String alertId,
+            @RequestParam Long stepId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to change step for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.changeStepWithAudit(alertId, stepId, auditLogRequest));
+    }
 
     @GetMapping("")
-    @Operation(summary = "Get all alerts; Use query params for search options like offset ,limit ,fuzzy search")
+    @Operation(summary = "Get all alerts with pagination and filtering")
     public ResponseEntity<Map<String, Object>> getAllAlerts(
             @RequestParam(required = false) String name,
             @RequestParam(required = false, name = "state") String state,
@@ -133,72 +250,134 @@ public class AlertController {
             @RequestParam(required = false, name = "to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date createdDateTo,
             @Valid @RequestParam(defaultValue = "10") int limit,
             @Valid @RequestParam(defaultValue = "0") int offset) {
-
-        Map<String, Object> allAlerts = alertService.getAllAlerts(name, state, accountNumberList, owners, assignees,
-                createdDateFrom, createdDateTo, limit, offset);
-
-        return ResponseEntity.ok().body(allAlerts);
+        log.debug("Request received to get all alerts with pagination and filtering");
+        return ResponseEntity.ok(alertService.getAllAlerts(name, state, accountNumberList,
+                owners, assignees, createdDateFrom, createdDateTo, limit, offset));
     }
 
-    @PatchMapping("{alertId}")
+    @GetMapping("/audit")
+    @Operation(summary = "Get all alerts with pagination, filtering, and audit")
+    public ResponseEntity<Map<String, Object>> getAllAlertsWithAudit(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false, name = "state") String state,
+            @RequestParam(required = false, name = "accountNumber") List<String> accountNumberList,
+            @RequestParam(required = false, name = "owner") List<String> owners,
+            @RequestParam(required = false, name = "assignee") List<String> assignees,
+            @RequestParam(required = false, name = "from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date createdDateFrom,
+            @RequestParam(required = false, name = "to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date createdDateTo,
+            @Valid @RequestParam(defaultValue = "10") int limit,
+            @Valid @RequestParam(defaultValue = "0") int offset,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to get all alerts with pagination, filtering, and audit");
+        return ResponseEntity.ok(alertService.getAllAlertsWithAudit(name, state, accountNumberList,
+                owners, assignees, createdDateFrom, createdDateTo, limit, offset, auditLogRequest));
+    }
+
+    @PatchMapping("/{alertId}")
     @Operation(summary = "Update an alert")
-    public ResponseEntity<Alert> patchAlert(@PathVariable final String alertId,
-                                            @RequestParam(required = true) String alertType, @RequestBody Alert alert) {
-        Alert updatedAlert = alertService.patchAlert(alertId, alertType, alert);
-        return ResponseEntity.ok().body(updatedAlert);
+    public ResponseEntity<Alert> patchAlert(
+            @PathVariable final String alertId,
+            @RequestParam(required = true) String alertType,
+            @RequestBody Alert alert) {
+        log.debug("Request received to patch alert: {} of type: {}", alertId, alertType);
+        return ResponseEntity.ok(alertService.patchAlert(alertId, alertType, alert));
     }
 
-    @DeleteMapping("{alertId}")
+    @PatchMapping("/audit/{alertId}")
+    @Operation(summary = "Update an alert with audit")
+    public ResponseEntity<Alert> patchAlertWithAudit(
+            @PathVariable final String alertId,
+            @RequestParam(required = true) String alertType,
+            @RequestBody Alert alert,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to patch alert: {} of type: {} with audit", alertId, alertType);
+        return ResponseEntity.ok(alertService.patchAlertWithAudit(alertId, alertType, alert, auditLogRequest));
+    }
+
+    @DeleteMapping("/{alertId}")
     @Operation(summary = "Delete an Alert by its id")
-    public ResponseEntity<Alert> deleteAlertById(@PathVariable final String alertId,
-                                                 @RequestParam(required = true) String alertType) {
+    public ResponseEntity<Void> deleteAlertById(
+            @PathVariable final String alertId,
+            @RequestParam(required = true) String alertType) {
+        log.debug("Request received to delete alert: {} of type: {}", alertId, alertType);
         alertService.deleteAlertById(alertId, alertType);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/audit/{alertId}")
+    @Operation(summary = "Delete an Alert by its id with audit")
+    public ResponseEntity<Void> deleteAlertByIdWithAudit(
+            @PathVariable final String alertId,
+            @RequestParam(required = true) String alertType,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to delete alert: {} of type: {} with audit", alertId, alertType);
+        alertService.deleteAlertByIdWithAudit(alertId, alertType, auditLogRequest);
+        return ResponseEntity.noContent().build();
     }
 
     @Hidden
     @PostMapping("/bulk")
     @Operation(summary = "Create bulk alerts")
     public ResponseEntity<List<Alert>> createAlerts(@RequestBody List<Alert> alerts) {
-        List<Alert> createdAlerts = alertService.createAlerts(alerts);
-        return ResponseEntity.ok().body(createdAlerts);
+        log.debug("Request received to create {} bulk alerts", alerts.size());
+        return ResponseEntity.ok(alertService.createAlerts(alerts));
     }
 
-
-
-//   @PostMapping("/create")
-//   @Operation(summary = "Create an alert")
-//   public ResponseEntity<Alert> createAlert(@RequestBody Alert alert) {
-//      Alert createdAlert = alertService.createAlert(alert);
-//      return ResponseEntity.ok().body(createdAlert);
-//   }
+    @Hidden
+    @PostMapping("/audit/bulk")
+    @Operation(summary = "Create bulk alerts with audit")
+    public ResponseEntity<List<Alert>> createAlertsWithAudit(
+            @RequestBody List<Alert> alerts,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to create {} bulk alerts with audit", alerts.size());
+        return ResponseEntity.ok(alertService.createAlertsWithAudit(alerts, auditLogRequest));
+    }
 
     @PostMapping("/create")
     @Operation(summary = "Create an alert")
     public ResponseEntity<Alert> createAlert(@RequestBody Alert alert) {
-        Alert createdAlert = alertService.createAlert(alert);
-        return ResponseEntity.ok().body(createdAlert);
+        log.debug("Request received to create new alert");
+        return ResponseEntity.ok(alertService.createAlert(alert));
+    }
+
+    @PostMapping("/audit/create")
+    @Operation(summary = "Create an alert with audit")
+    public ResponseEntity<Alert> createAlertWithAudit(
+            @RequestBody Alert alert,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to create new alert with audit");
+        return ResponseEntity.ok(alertService.createAlertWithAudit(alert, auditLogRequest));
+    }
+
+    @GetMapping("/{alertId}")
+    @Operation(summary = "Get an Alert by its mongoDB id")
+    public ResponseEntity<Alert> getAlertById(
+            @PathVariable final String alertId,
+            @RequestParam(required = false) String alertType) {
+        log.debug("Request received to get alert by ID: {} and type: {}", alertId, alertType);
+        return ResponseEntity.ok(alertService.getAlertById(alertId, alertType));
+    }
+
+    @GetMapping("/audit/{alertId}")
+    @Operation(summary = "Get an Alert by its mongoDB id with audit")
+    public ResponseEntity<Alert> getAlertByIdWithAudit(
+            @PathVariable final String alertId,
+            @RequestParam(required = false) String alertType,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to get alert by ID: {} and type: {} with audit", alertId, alertType);
+        return ResponseEntity.ok(alertService.getAlertByIdWithAudit(alertId, alertType, auditLogRequest));
     }
 
     @ExceptionHandler(AlertValidationException.class)
-    public ResponseEntity<Map<String, List<String>>> handleAlertValidationException(AlertValidationException ex) {
+    public ResponseEntity<Map<String, List<String>>> handleAlertValidationException(
+            AlertValidationException ex) {
+        log.error("Alert validation exception occurred: {}", ex.getMessage());
         Map<String, List<String>> errorResponse = new HashMap<>();
         errorResponse.put("errors", ex.getErrors());
         return ResponseEntity.badRequest().body(errorResponse);
     }
-
-
-    @GetMapping("{alertId}")
-    @Operation(summary = "Get an Alert by its mongoDB id")
-    public ResponseEntity<Alert> getAlertById(@PathVariable final String alertId,
-                                              @RequestParam(required = false) String alertType) {
-        Alert alertById = alertService.getAlertById(alertId, alertType);
-        return ResponseEntity.ok().body(alertById);
-    }
-
-
-
 }
+
 
 
 
@@ -208,6 +387,7 @@ public class AlertController {
 //import com.dair.cais.audit.AuditLogRequest;
 //import io.swagger.v3.oas.annotations.Operation;
 //import io.swagger.v3.oas.annotations.tags.Tag;
+//import lombok.extern.slf4j.Slf4j;
 //import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.format.annotation.DateTimeFormat;
 //import org.springframework.http.ResponseEntity;
@@ -220,6 +400,7 @@ public class AlertController {
 //import java.util.Map;
 //
 //@RestController
+//@Slf4j
 //@RequestMapping("/alerts")
 //@Tag(name = "alerts-with-audit")
 //public class AlertController {
@@ -266,11 +447,14 @@ public class AlertController {
 //        return ResponseEntity.ok().body(alerts);
 //    }
 //
-//    @GetMapping("/alertbyloggedinUser/{userId}")
-//    @Operation(summary = "Get alerts from orgFamily, with audit")
-//    public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyBYUserOrgUnits(@PathVariable String userId,
-//                                                                                 @RequestBody AuditLogRequest auditLogRequest) {
-//        List<AlertEntity> alerts = alertServiceWithAudit.findAlertsByOrgFamilyBYUserOrgKeys(userId,auditLogRequest);
+//    @GetMapping("/alertbyloggedinUser/{userId}")  // Changed to POST since we're using request body
+//    @Operation(summary = "Get alerts from orgFamily for logged in user")
+//    public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyBYUserOrgUnits(
+//            @PathVariable String userId,
+//            @RequestBody AuditLogRequest auditLogRequest) {
+//
+//        log.debug("Received request to find alerts for user: {} with audit request: {}", userId, auditLogRequest);
+//        List<AlertEntity> alerts = alertServiceWithAudit.findAlertsByOrgFamilyBYUserOrgKeys(userId, auditLogRequest);
 //        return ResponseEntity.ok().body(alerts);
 //    }
 //
@@ -418,5 +602,209 @@ public class AlertController {
 //
 //
 //}
+
+
+
+
+
+//package com.dair.cais.alert;
+//
+//        import io.swagger.v3.oas.annotations.Hidden;
+//        import io.swagger.v3.oas.annotations.Operation;
+//        import io.swagger.v3.oas.annotations.tags.Tag;
+//        import org.springframework.beans.factory.annotation.Autowired;
+//        import org.springframework.format.annotation.DateTimeFormat;
+//        import org.springframework.http.ResponseEntity;
+//        import org.springframework.web.bind.annotation.*;
+//
+//        import javax.validation.Valid;
+//        import java.util.Date;
+//        import java.util.HashMap;
+//        import java.util.List;
+//        import java.util.Map;
+//
+//@RestController
+//@RequestMapping("/alerts")
+//@Tag(name = "alerts")
+//
+//public class AlertController {
+//    @Autowired
+//    private AlertService alertService;
+//
+//    @PostMapping("/insert")
+//    @Operation(summary = "Create an alert with alert data payload and alert type")
+//    public ResponseEntity<AlertEntity> insertAlert(
+//            @RequestParam String alertType,
+//            @RequestBody AlertEntity alertEntity) {
+//        AlertEntity createdAlert = alertService.insertAlert(alertType, alertEntity);
+//        return ResponseEntity.ok().body(createdAlert);
+//    }
+//
+//    @GetMapping("/alertId/{alertId}")
+//    @Operation(summary = "Get an alertId using the alert field alertId")
+//    public ResponseEntity<Alert> getAlertById(@PathVariable final String alertId) {
+//        Alert alertById = alertService.getAlertOnId(alertId);
+//        return ResponseEntity.ok().body(alertById);
+//    }
 //
 //
+//    @GetMapping("/findAlertsByOrgFamily")
+//    @Operation(summary = "Get alerts from orgFamily")
+//    public List<AlertEntity> findAlertsByOrgFamily(@RequestParam("org") String substring) {
+//        return alertService.findAlertsByOrgFamily(substring);
+//    }
+//
+//    @GetMapping("/findAlertsByOrg")
+//    @Operation(summary = "Get alerts from orgId")
+//    public List<AlertEntity> findAlertsByOrg(@RequestParam("org") String substring) {
+//        return alertService.findAlertsByOrg(substring);
+//    }
+//
+//    @GetMapping("/find")
+//    @Operation(summary = "Mandatory/base level field filters to fetch the list of alerts")
+//    public List<AlertEntity> findAlertsByCriteria(
+//            @RequestParam(required = false) String alertId,
+//            @RequestParam(required = false) String createDate,
+//            @RequestParam(required = false) String lastUpdateDate,
+//            @RequestParam(required = false) String totalScore,
+//            @RequestParam(required = false) String createdBy,
+//            @RequestParam(required = false) String businessDate,
+//            @RequestParam(required = false) String focalEntity,
+//            @RequestParam(required = false) String focus,
+//            @RequestParam(required = false) String alertTypeId,
+//            @RequestParam(required = false) String alertRegion,
+//            @RequestParam(required = false) String alertGroupId,
+//            @RequestParam(required = false) Boolean isConsolidated,
+//            @RequestParam(required = false) Boolean isActive,
+//            @RequestParam(required = false) Boolean hasMultipleScenario,
+//            @RequestParam(required = false) Boolean isDeleted,
+//            @RequestParam(required = false) String orgUnitId,
+//            @RequestParam(required = false) String orgFamily,
+//            @RequestParam(required = false) String previousOrgUnitId,
+//            @RequestParam(required = false) Boolean isOrgUnitUpdated,
+//            @RequestParam(required = false) Boolean isRelatedAlert,
+//            @RequestParam(required = false) String ownerId,
+//            @RequestParam(required = false) String ownerName,
+//            @RequestParam(required = false) String status,
+//            @RequestParam(required = false) String alertStepId,
+//            @RequestParam(required = false) String alertStepName,
+//            @RequestParam(required = false) Boolean isCaseCreated
+//    ) {
+//        return alertService.findAlertsByCriteria(
+//                alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate,
+//                focalEntity, focus, alertTypeId, alertRegion, alertGroupId, isConsolidated,
+//                isActive, hasMultipleScenario, isDeleted, orgUnitId, orgFamily, previousOrgUnitId,
+//                isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId, alertStepName, isCaseCreated
+//        );
+//    }
+//
+//    @PatchMapping("/changescore")
+//    public ResponseEntity<Alert> updateTotalScore(@PathVariable String alertId, @RequestParam int totalScore) {
+//        Alert updatedAlert = alertService.updateTotalScore(alertId, totalScore);
+//        return ResponseEntity.ok().body(updatedAlert);
+//    }
+//
+//
+//    @PatchMapping("/changeowner")
+//    public ResponseEntity<Alert> updateOwnerId(@PathVariable String alertId, @RequestParam String ownerId) {
+//        Alert updatedAlert = alertService.updateOwnerId(alertId, ownerId);
+//        return ResponseEntity.ok().body(updatedAlert);
+//    }
+//
+//    @PatchMapping("/changeorg")
+//    public ResponseEntity<Alert> updateOrgUnitId(@PathVariable String alertId, @RequestParam String orgUnitId) {
+//        Alert updatedAlert = alertService.updateOrgUnitId(alertId, orgUnitId);
+//        return ResponseEntity.ok().body(updatedAlert);
+//    }
+//
+//    @PatchMapping("/changestatus")
+//    public ResponseEntity<Alert> updateStatus(@PathVariable String alertId, @RequestParam String statusId) {
+//        Alert updatedAlert = alertService.updateStatus(alertId, statusId);
+//        return ResponseEntity.ok().body(updatedAlert);
+//    }
+//
+//    @PatchMapping("/changestep/{alertId}")
+//    public ResponseEntity<Alert> changeStep(@PathVariable String alertId, @RequestParam Long stepId) {
+//        Alert updatedAlert = alertService.changeStep(alertId, stepId);
+//        return ResponseEntity.ok(updatedAlert);
+//    }
+//
+//
+//    @GetMapping("")
+//    @Operation(summary = "Get all alerts; Use query params for search options like offset ,limit ,fuzzy search")
+//    public ResponseEntity<Map<String, Object>> getAllAlerts(
+//            @RequestParam(required = false) String name,
+//            @RequestParam(required = false, name = "state") String state,
+//            @RequestParam(required = false, name = "accountNumber") List<String> accountNumberList,
+//            @RequestParam(required = false, name = "owner") List<String> owners,
+//            @RequestParam(required = false, name = "assignee") List<String> assignees,
+//            @RequestParam(required = false, name = "from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date createdDateFrom,
+//            @RequestParam(required = false, name = "to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date createdDateTo,
+//            @Valid @RequestParam(defaultValue = "10") int limit,
+//            @Valid @RequestParam(defaultValue = "0") int offset) {
+//
+//        Map<String, Object> allAlerts = alertService.getAllAlerts(name, state, accountNumberList, owners, assignees,
+//                createdDateFrom, createdDateTo, limit, offset);
+//
+//        return ResponseEntity.ok().body(allAlerts);
+//    }
+//
+//    @PatchMapping("{alertId}")
+//    @Operation(summary = "Update an alert")
+//    public ResponseEntity<Alert> patchAlert(@PathVariable final String alertId,
+//                                            @RequestParam(required = true) String alertType, @RequestBody Alert alert) {
+//        Alert updatedAlert = alertService.patchAlert(alertId, alertType, alert);
+//        return ResponseEntity.ok().body(updatedAlert);
+//    }
+//
+//    @DeleteMapping("{alertId}")
+//    @Operation(summary = "Delete an Alert by its id")
+//    public ResponseEntity<Alert> deleteAlertById(@PathVariable final String alertId,
+//                                                 @RequestParam(required = true) String alertType) {
+//        alertService.deleteAlertById(alertId, alertType);
+//        return ResponseEntity.ok().build();
+//    }
+//
+//    @Hidden
+//    @PostMapping("/bulk")
+//    @Operation(summary = "Create bulk alerts")
+//    public ResponseEntity<List<Alert>> createAlerts(@RequestBody List<Alert> alerts) {
+//        List<Alert> createdAlerts = alertService.createAlerts(alerts);
+//        return ResponseEntity.ok().body(createdAlerts);
+//    }
+//
+//
+//
+////   @PostMapping("/create")
+////   @Operation(summary = "Create an alert")
+////   public ResponseEntity<Alert> createAlert(@RequestBody Alert alert) {
+////      Alert createdAlert = alertService.createAlert(alert);
+////      return ResponseEntity.ok().body(createdAlert);
+////   }
+//
+//    @PostMapping("/create")
+//    @Operation(summary = "Create an alert")
+//    public ResponseEntity<Alert> createAlert(@RequestBody Alert alert) {
+//        Alert createdAlert = alertService.createAlert(alert);
+//        return ResponseEntity.ok().body(createdAlert);
+//    }
+//
+//    @ExceptionHandler(AlertValidationException.class)
+//    public ResponseEntity<Map<String, List<String>>> handleAlertValidationException(AlertValidationException ex) {
+//        Map<String, List<String>> errorResponse = new HashMap<>();
+//        errorResponse.put("errors", ex.getErrors());
+//        return ResponseEntity.badRequest().body(errorResponse);
+//    }
+//
+//
+//    @GetMapping("{alertId}")
+//    @Operation(summary = "Get an Alert by its mongoDB id")
+//    public ResponseEntity<Alert> getAlertById(@PathVariable final String alertId,
+//                                              @RequestParam(required = false) String alertType) {
+//        Alert alertById = alertService.getAlertById(alertId, alertType);
+//        return ResponseEntity.ok().body(alertById);
+//    }
+//
+//
+//
+//}

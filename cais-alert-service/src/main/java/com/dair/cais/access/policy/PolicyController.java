@@ -1,13 +1,22 @@
 package com.dair.cais.access.policy;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/policies")
+@RequiredArgsConstructor
+@Tag(name = "Policy Management", description = "APIs for managing policies")
 public class PolicyController {
 
     @Autowired
@@ -60,4 +69,41 @@ public class PolicyController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @DeleteMapping("/{policyId}")
+    @Operation(summary = "Delete a policy by ID",
+            description = "Deletes a policy after validating it's not in use by any roles")
+    @ApiResponse(responseCode = "204", description = "Policy successfully deleted")
+    @ApiResponse(responseCode = "400", description = "Policy is in use by roles")
+    @ApiResponse(responseCode = "404", description = "Policy not found")
+    public ResponseEntity<?> deletePolicy(@PathVariable Integer policyId) {
+        log.info("Received request to delete policy with ID: {}", policyId);
+
+        try {
+            policyService.deletePolicy(policyId);
+            return ResponseEntity.noContent().build();
+        } catch (PolicyInUseException e) {
+            log.warn("Policy {} is in use by roles: {}", policyId, e.getRolesByPolicy());
+            return ResponseEntity.badRequest().body(new PolicyDeletionError(e.getMessage(), e.getRolesByPolicy()));
+        }
+    }
+
+    @DeleteMapping("/bulk")
+    @Operation(summary = "Bulk delete policies",
+            description = "Deletes multiple policies after validating none are in use by roles")
+    @ApiResponse(responseCode = "204", description = "Policies successfully deleted")
+    @ApiResponse(responseCode = "400", description = "One or more policies are in use by roles")
+    public ResponseEntity<?> bulkDeletePolicies(@RequestBody List<Integer> policyIds) {
+        log.info("Received request to delete {} policies", policyIds.size());
+
+        try {
+            policyService.bulkDeletePolicies(policyIds);
+            return ResponseEntity.noContent().build();
+        } catch (PolicyInUseException e) {
+            log.warn("Some policies are in use by roles: {}", e.getRolesByPolicy());
+            return ResponseEntity.badRequest().body(new PolicyDeletionError(e.getMessage(), e.getRolesByPolicy()));
+        }
+    }
+
+    record PolicyDeletionError(String message, Map<Integer, List<String>> rolesByPolicy) {}
 }

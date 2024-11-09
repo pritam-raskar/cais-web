@@ -84,6 +84,7 @@ com/dair/cais/common/config/CustomCacheable.class
 com/dair/cais/type/AlertTypeController$2.class
 com/dair/cais/connection/metadata/ConnectionMetadataRepository.class
 com/dair/cais/note/NoteMapperExtended.class
+com/dair/cais/access/policy/PolicyInUseException.class
 com/dair/cais/access/policy/PolicyController.class
 com/dair/cais/hierarchy/HierarchyController.class
 com/dair/cais/hierarchy/HierarchyRepository.class
@@ -121,6 +122,7 @@ com/dair/cais/common/config/MongoConfig.class
 com/dair/cais/access/UserBasedPermission/AlertTypeOrgPermissions.class
 com/dair/cais/connection/ConnectionRepository.class
 com/dair/cais/CaisAlertApplication$WebConfig.class
+com/dair/cais/access/policy/PolicyController$PolicyDeletionError.class
 com/dair/cais/access/modules/Module.class
 com/dair/cais/connection/ConnectionValidationService.class
 com/dair/cais/organization/OrganizationUnitService.class
@@ -173,6 +175,7 @@ com/dair/cais/access/alertType/alertTypeEntity.class
 com/dair/cais/access/Role/RoleEntity.class
 com/dair/cais/connection/metadata/DuplicateConnectionException.class
 com/dair/cais/organization/util/CsvHelper.class
+com/dair/cais/access/PolicyEntityMapping/PolicyEntityMappingService$MappingKey.class
 com/dair/cais/access/entity/SystemEntity.class
 com/dair/cais/access/PolicyModuleMapping/PolicyModuleMappingService.class
 com/dair/cais/access/Actions/ActionRepository.class

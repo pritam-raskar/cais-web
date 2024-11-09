@@ -10,6 +10,7 @@ public class PolicyEntityMapping {
     private String policyName;    // For convenience in responses
     private String entityType;
     private String entityId;
+    private String entityName;
     private Integer actionId;
     private String actionName;    // For convenience in responses
     private String actionCategory;

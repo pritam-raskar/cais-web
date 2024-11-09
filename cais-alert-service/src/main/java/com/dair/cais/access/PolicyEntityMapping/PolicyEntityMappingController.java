@@ -133,4 +133,22 @@ public class PolicyEntityMappingController {
         mappingService.deleteMappingsByPolicyIdAndEntityType(policyId, entityType);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/policy/{policyId}")
+    @Operation(
+            summary = "Update policy mappings",
+            description = "Updates all mappings for a policy. Adds new mappings and removes old ones not present in the request."
+    )
+    @ApiResponse(responseCode = "200", description = "Successfully updated mappings")
+    @ApiResponse(responseCode = "400", description = "Invalid input data")
+    @ApiResponse(responseCode = "404", description = "Policy not found")
+    public ResponseEntity<List<PolicyEntityMapping>> updatePolicyMappings(
+            @PathVariable Integer policyId,
+            @Valid @RequestBody List<PolicyEntityMapping> mappings) {
+
+        log.info("REST request to update all mappings for policy : {}", policyId);
+
+        List<PolicyEntityMapping> result = mappingService.updatePolicyMappings(policyId, mappings);
+        return ResponseEntity.ok(result);
+    }
 }

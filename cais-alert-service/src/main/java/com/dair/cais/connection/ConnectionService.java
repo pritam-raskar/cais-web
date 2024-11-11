@@ -1,15 +1,20 @@
 package com.dair.cais.connection;
 
 import com.dair.cais.exception.ConnectionValidationException;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
 import java.sql.DriverManager;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -98,27 +103,27 @@ public class ConnectionService {
         }
     }
 
-    private boolean testConnectionByType(ConnectionType connectionType, ConnectionDetails details) {
-        try {
-            switch (connectionType) {
-                case POSTGRESQL:
-                    return testPostgresqlConnection(details);
-                case MONGODB:
-                    return testMongoDbConnection(details);
-                case MYSQL:
-                case MARIADB:
-                    return testMysqlConnection(details);
-                case SNOWFLAKE:
-                    return testSnowflakeConnection(details);
-                default:
-                    log.error("Unsupported connection type: {}", connectionType);
-                    return false;
-            }
-        } catch (Exception e) {
-            log.error("Error testing connection of type {}: {}", connectionType, e.getMessage());
-            return false;
-        }
-    }
+//    private boolean testConnectionByType(ConnectionType connectionType, ConnectionDetails details) {
+//        try {
+//            switch (connectionType) {
+//                case POSTGRESQL:
+//                    return testPostgresqlConnection(details);
+//                case MONGODB:
+//                    return testMongoDbConnection(details);
+//                case MYSQL:
+//                case MARIADB:
+//                    return testMysqlConnection(details);
+//                case SNOWFLAKE:
+//                    return testSnowflakeConnection(details);
+//                default:
+//                    log.error("Unsupported connection type: {}", connectionType);
+//                    return false;
+//            }
+//        } catch (Exception e) {
+//            log.error("Error testing connection of type {}: {}", connectionType, e.getMessage());
+//            return false;
+//        }
+//    }
 
     private boolean testPostgresqlConnection(ConnectionDetails details) {
         String url = String.format("jdbc:postgresql://%s:%d/%s",
@@ -265,6 +270,164 @@ public class ConnectionService {
         } catch (Exception e) {
             log.error("Error deleting connection", e);
             throw new RuntimeException("Error deleting connection", e);
+        }
+    }
+
+    private boolean testConnectionByType(ConnectionType connectionType, ConnectionDetails details) {
+        try {
+            switch (connectionType) {
+                case POSTGRESQL:
+                    return testPostgresqlConnection(details);
+                case MONGODB:
+                    return testMongoDbConnection(details);
+                case MYSQL:
+                case MARIADB:
+                    return testMysqlConnection(details);
+                case SNOWFLAKE:
+                    return testSnowflakeConnection(details);
+                default:
+                    log.error("Unsupported connection type: {}", connectionType);
+                    return false;
+            }
+        } catch (Exception e) {
+            log.error("Error testing connection of type {}: {}", connectionType, e.getMessage());
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getConnectionAndTestQuery(Long connectionId, String testQuery) {
+        log.info("Testing connection and executing query for connection ID: {}", connectionId);
+
+        ConnectionEntity entity = repository.findById(connectionId)
+                .orElseThrow(() -> {
+                    log.error("Connection not found with ID: {}", connectionId);
+                    return new ConnectionValidationException("Connection not found");
+                });
+
+        try {
+            ConnectionDetails details = encryptionService.decryptObject(
+                    entity.getEncryptedData(),
+                    entity.getIv(),
+                    ConnectionDetails.class
+            );
+
+            if (!testConnectionByType(entity.getConnectionType(), details)) {
+                throw new ConnectionValidationException("Failed to establish connection");
+            }
+
+            return executeQuery(entity.getConnectionType(), details, testQuery);
+
+        } catch (Exception e) {
+            log.error("Error testing connection or executing query for ID: {}", connectionId, e);
+            throw new ConnectionValidationException("Failed to test connection or execute query: " + e.getMessage());
+        }
+    }
+
+    private List<Map<String, Object>> executeQuery(ConnectionType connectionType, ConnectionDetails details, String testQuery) {
+//        if (connectionType == ConnectionType.MONGODB) {
+//            return executeMongoQuery(details, testQuery);
+//        }
+
+        return executeJdbcQuery(connectionType, details, testQuery);
+    }
+
+//    private List<Map<String, Object>> executeMongoQuery(ConnectionDetails details, String testQuery) {
+//        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s",
+//                details.getUsername(),
+//                details.getPassword(),
+//                details.getHost(),
+//                details.getPort(),
+//                details.getDatabase());
+//
+//        try (SimpleMongoClientDatabaseFactory factory = new SimpleMongoClientDatabaseFactory(connectionString)) {
+//            MongoTemplate mongoTemplate = new MongoTemplate(factory);
+//            // Note: This is a simplified implementation. You might want to add proper MongoDB query parsing
+//            return mongoTemplate.find(org.springframework.data.mongodb.core.query.Query.class, Map.class, testQuery);
+//        } catch (Exception e) {
+//            log.error("Error executing MongoDB query: {}", e.getMessage());
+//            throw new ConnectionValidationException("Failed to execute MongoDB query: " + e.getMessage());
+//        }
+//    }
+
+    private List<Map<String, Object>> executeJdbcQuery(ConnectionType connectionType, ConnectionDetails details, String testQuery) {
+        DataSource dataSource = null;
+        try {
+            dataSource = createDataSource(connectionType, details);
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            return jdbcTemplate.queryForList(testQuery);
+        } catch (Exception e) {
+            log.error("Error executing JDBC query: {}", e.getMessage());
+            throw new ConnectionValidationException("Failed to execute query: " + e.getMessage());
+        } finally {
+            closeDataSource(dataSource);
+        }
+    }
+
+    private DataSource createDataSource(ConnectionType connectionType, ConnectionDetails details) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(buildJdbcUrl(connectionType, details));
+        config.setUsername(details.getUsername());
+        config.setPassword(details.getPassword());
+        config.setDriverClassName(connectionType.getDriverClass());
+
+        // Connection pool settings
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(0);
+        config.setConnectionTimeout(5000); // 5 seconds
+        config.setIdleTimeout(10000); // 10 seconds
+
+        return new HikariDataSource(config);
+    }
+
+    private String buildJdbcUrl(ConnectionType connectionType, ConnectionDetails details) {
+        String baseUrl = String.format("jdbc:%s://%s:%d/%s",
+                connectionType.getDatabaseType(),
+                details.getHost(),
+                details.getPort(),
+                details.getDatabase());
+
+        if (connectionType == ConnectionType.SNOWFLAKE) {
+            return String.format("jdbc:snowflake://%s.snowflakecomputing.com/?db=%s&warehouse=%s",
+                    details.getHost(),
+                    details.getDatabase(),
+                    details.getAdditionalParams());
+        }
+
+        // Add additional parameters if they exist
+        if (details.getAdditionalParams() != null && !details.getAdditionalParams().isEmpty()) {
+            baseUrl += "?" + details.getAdditionalParams();
+        }
+
+        return baseUrl;
+    }
+
+    private void closeDataSource(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource) {
+            try {
+                ((HikariDataSource) dataSource).close();
+            } catch (Exception e) {
+                log.warn("Error closing datasource: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsById(Long connectionId) {
+        try {
+            log.debug("Checking existence of connection with ID: {}", connectionId);
+            return repository.existsById(connectionId);
+        } catch (Exception e) {
+            log.error("Error checking existence of connection with ID {}: {}", connectionId, e.getMessage());
+            throw new ConnectionValidationException("Error verifying connection existence", e);
+        }
+    }
+    // Convenience method that throws an exception if not found
+    @Transactional(readOnly = true)
+    public void validateConnectionExists(Long connectionId) {
+        if (!existsById(connectionId)) {
+            log.error("Connection not found with ID: {}", connectionId);
+            throw new ConnectionValidationException("Connection not found with ID: " + connectionId);
         }
     }
 }

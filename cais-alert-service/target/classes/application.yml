@@ -87,8 +87,7 @@ cloud:
 
 # Encryption Configuration
 encryption:
-  key: ${ENCRYPTION_KEY:your-default-encryption-key}
-  algorithm: AES/CBC/PKCS5PADDING
+  key: fef41ed234b3fa29d8ccaee771a4002e19e77022c10fc193eeab6c23b13e24c1
 
 # Management Configuration
 management:

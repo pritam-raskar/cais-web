@@ -28,7 +28,9 @@ com/dair/cais/audit/AuditTrail.class
 com/dair/cais/organization/OrganizationUnit.class
 com/dair/cais/organization/OrganizationUnitEntity.class
 com/dair/cais/access/Role/RoleRepository.class
+com/dair/cais/connection/EncryptionRequest.class
 com/dair/cais/access/entity/SystemEntityJpa.class
+com/dair/cais/connection/DecryptionRequest.class
 com/dair/cais/alert/AlertRepository.class
 com/dair/cais/exception/GlobalExceptionHandler.class
 com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingMapper.class
@@ -44,9 +46,11 @@ com/dair/cais/connection/Connection.class
 com/dair/cais/access/userOrgRole/UserOrgRoleMappingRepository.class
 com/dair/cais/hierarchy/Hierarchy.class
 com/dair/cais/access/Role/RoleService.class
+com/dair/cais/connection/EncryptionException.class
 com/dair/cais/steps/StepRepository.class
 com/dair/cais/communication/CommunicationEntity.class
 com/dair/cais/access/PolicyEntityMapping/PolicyEntityMapping.class
+com/dair/cais/connection/EncryptionResponse.class
 com/dair/cais/fileattachement/LocalFileStorageService.class
 com/dair/cais/connector/Connector.class
 com/dair/cais/steps/StepStatusRepository.class
@@ -125,6 +129,7 @@ com/dair/cais/CaisAlertApplication$WebConfig.class
 com/dair/cais/access/policy/PolicyController$PolicyDeletionError.class
 com/dair/cais/access/modules/Module.class
 com/dair/cais/connection/ConnectionValidationService.class
+com/dair/cais/connection/DecryptionException.class
 com/dair/cais/organization/OrganizationUnitService.class
 com/dair/cais/type/AlertTypeEntityExtended.class
 com/dair/cais/access/policy/PolicyEntity.class
@@ -150,6 +155,7 @@ com/dair/cais/fileattachement/CmAttachmentRepository.class
 com/dair/cais/connection/EncryptedData.class
 com/dair/cais/access/UserBasedPermission/OrgActions.class
 com/dair/cais/type/AlertTypeController$1.class
+com/dair/cais/connection/DecryptionResponse.class
 com/dair/cais/note/NoteRepository.class
 com/dair/cais/access/PolicyModuleMapping/PolicyModuleMappingRepository.class
 com/dair/cais/access/UserBasedPermission/ActionCondition.class

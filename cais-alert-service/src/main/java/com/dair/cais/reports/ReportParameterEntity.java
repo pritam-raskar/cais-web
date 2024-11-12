@@ -5,6 +5,10 @@ import com.dair.cais.reports.enums.enums;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.Map;
 
 @Data
 @Entity
@@ -37,5 +41,6 @@ public class ReportParameterEntity extends BaseEntity {
     private String defaultValue;
 
     @Column(name = "validation_rules", columnDefinition = "jsonb")
-    private String validationRules;
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> validationRules;  // Changed from String to Map
 }

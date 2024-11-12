@@ -14,5 +14,5 @@ public class ReportParameterDto {
     private ParameterType parameterType;
     private Boolean isRequired;
     private String defaultValue;
-    private Map<String, Object> validationRules;
+    private Map<String, Object> validationRules;  // This should be Map, not String
 }

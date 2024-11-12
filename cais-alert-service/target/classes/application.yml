@@ -89,6 +89,7 @@ cloud:
 encryption:
   key: fef41ed234b3fa29d8ccaee771a4002e19e77022c10fc193eeab6c23b13e24c1
 
+
 # Management Configuration
 management:
   endpoints:

@@ -107,6 +107,8 @@ public class ReportDesignerService {
 
 
 
+
+
     @Transactional
     public ReportDto updateReport(Integer reportId, ReportUpdateDto updateDto) {
         log.info("Updating report with ID: {}", reportId);
@@ -136,50 +138,156 @@ public class ReportDesignerService {
             }
             report.setUpdatedAt(ZonedDateTime.now());
 
-            // Update columns if provided
-            List<ReportColumnEntity> updatedColumns = null;
+            // Save the report first
+            ReportsEntity updatedReport = reportRepository.save(report);
+
+            // Handle columns update
+            List<ReportColumnEntity> existingColumns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
+            List<ReportColumnEntity> updatedColumns = new ArrayList<>();
+
             if (updateDto.getColumns() != null) {
-                updateReportColumns(report.getReportId(), updateDto.getColumns());
-                updatedColumns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
+                // Create a map of existing columns by source column for easier lookup
+                Map<String, ReportColumnEntity> existingColumnMap = existingColumns.stream()
+                        .collect(Collectors.toMap(
+                                ReportColumnEntity::getSourceColumn,
+                                column -> column,
+                                (existing, replacement) -> existing
+                        ));
+
+                // Process each column in the update
+                updatedColumns = updateDto.getColumns().stream()
+                        .map(colDto -> {
+                            ReportColumnEntity column = existingColumnMap.get(colDto.getSourceColumn());
+                            if (column == null) {
+                                // This is a new column
+                                column = new ReportColumnEntity();
+                                column.setReportId(reportId);
+                                column.setSourceColumn(colDto.getSourceColumn());
+                                column.setDataType(colDto.getDataType());
+                            }
+
+                            // Update column properties
+                            if (colDto.getDisplayName() != null) {
+                                column.setDisplayName(colDto.getDisplayName());
+                            }
+                            if (colDto.getIsSortable() != null) {
+                                column.setIsSortable(colDto.getIsSortable());
+                            }
+                            if (colDto.getIsFilterable() != null) {
+                                column.setIsFilterable(colDto.getIsFilterable());
+                            }
+                            if (colDto.getIsExportable() != null) {
+                                column.setIsExportable(colDto.getIsExportable());
+                            }
+                            if (colDto.getIsVisible() != null) {
+                                column.setIsVisible(colDto.getIsVisible());
+                            }
+                            if (colDto.getSortPriority() != null) {
+                                column.setSortPriority(colDto.getSortPriority());
+                            }
+                            if (colDto.getSortDirection() != null) {
+                                column.setSortDirection(colDto.getSortDirection());
+                            }
+                            if (colDto.getColumnWidth() != null) {
+                                column.setColumnWidth(colDto.getColumnWidth());
+                            }
+                            if (colDto.getAlignment() != null) {
+                                column.setAlignment(colDto.getAlignment());
+                            }
+                            if (colDto.getFormattingJson() != null) {
+                                try {
+                                    Map<String, Object> formattingMap = objectMapper.convertValue(
+                                            colDto.getFormattingJson(),
+                                            new TypeReference<Map<String, Object>>() {}
+                                    );
+                                    column.setFormattingJson(formattingMap);
+                                } catch (Exception e) {
+                                    log.error("Error converting formatting JSON: {}", e.getMessage());
+                                }
+                            }
+
+                            return column;
+                        })
+                        .collect(Collectors.toList());
+
+                // Save updated and new columns
+                updatedColumns = columnRepository.saveAll(updatedColumns);
+
+                // Delete columns that aren't in the update
+                Set<String> updatedColumnSources = updatedColumns.stream()
+                        .map(ReportColumnEntity::getSourceColumn)
+                        .collect(Collectors.toSet());
+
+                existingColumns.stream()
+                        .filter(col -> !updatedColumnSources.contains(col.getSourceColumn()))
+                        .forEach(columnRepository::delete);
             }
 
-            // Update parameters if provided
-            List<ReportParameterEntity> updatedParameters = null;
-            if (updateDto.getParameters() != null) {
-                // Delete existing parameters
-                parameterRepository.deleteByReportId(reportId);
+            // Handle parameters update
+            List<ReportParameterEntity> existingParameters = parameterRepository.findByReportId(reportId);
+            List<ReportParameterEntity> updatedParameters = new ArrayList<>();
 
-                // Create and save new parameters
-                List<ReportParameterEntity> newParameters = updateDto.getParameters().stream()
+            if (updateDto.getParameters() != null) {
+                // Create a map of existing parameters by name for easier lookup
+                Map<String, ReportParameterEntity> existingParamMap = existingParameters.stream()
+                        .collect(Collectors.toMap(
+                                ReportParameterEntity::getParameterName,
+                                param -> param,
+                                (existing, replacement) -> existing
+                        ));
+
+                // Process each parameter in the update
+                updatedParameters = updateDto.getParameters().stream()
                         .map(paramDto -> {
-                            ReportParameterEntity param = createParameterEntity(paramDto, report);
-                            param.setCreatedAt(ZonedDateTime.now());
+                            ReportParameterEntity param = existingParamMap.get(paramDto.getParameterName());
+                            if (param == null) {
+                                // This is a new parameter
+                                param = new ReportParameterEntity();
+                                param.setReport(report);
+                                param.setParameterName(paramDto.getParameterName());
+                            }
+
+                            // Update parameter properties
+                            if (paramDto.getParameterLabel() != null) {
+                                param.setParameterLabel(paramDto.getParameterLabel());
+                            }
+                            if (paramDto.getParameterType() != null) {
+                                param.setParameterType(paramDto.getParameterType());
+                            }
+                            if (paramDto.getIsRequired() != null) {
+                                param.setIsRequired(paramDto.getIsRequired());
+                            }
+                            if (paramDto.getDefaultValue() != null) {
+                                param.setDefaultValue(paramDto.getDefaultValue());
+                            }
+                            if (paramDto.getValidationRules() != null) {
+                                param.setValidationRules(paramDto.getValidationRules());
+                            }
+
                             param.setUpdatedAt(ZonedDateTime.now());
                             return param;
                         })
-                        .toList();
-                parameterRepository.saveAll(newParameters);
-                updatedParameters = parameterRepository.findByReportId(reportId);
-                log.debug("Updated {} parameters for report {}", newParameters.size(), reportId);
+                        .collect(Collectors.toList());
+
+                // Save updated and new parameters
+                updatedParameters = parameterRepository.saveAll(updatedParameters);
+
+                // Delete parameters that aren't in the update
+                Set<String> updatedParamNames = updatedParameters.stream()
+                        .map(ReportParameterEntity::getParameterName)
+                        .collect(Collectors.toSet());
+
+                existingParameters.stream()
+                        .filter(param -> !updatedParamNames.contains(param.getParameterName()))
+                        .forEach(parameterRepository::delete);
             }
 
-            // Save changes
-            ReportsEntity updatedReport = reportRepository.save(report);
-            log.debug("Updated report successfully");
-
-            // Get latest columns and parameters if not updated
-            if (updatedColumns == null) {
-                updatedColumns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
-            }
-            if (updatedParameters == null) {
-                updatedParameters = parameterRepository.findByReportId(reportId);
-            }
-
-            // Return updated report
+            // Return updated report with columns and parameters
             return mapToDto(updatedReport, updatedColumns, updatedParameters);
+
         } catch (Exception e) {
             log.error("Error updating report {}: {}", reportId, e.getMessage(), e);
-            throw new ReportUpdateException("Failed to update report", e);
+            throw new ReportUpdateException("Failed to update report: " + e.getMessage(), e);
         }
     }
 
@@ -226,17 +334,9 @@ public class ReportDesignerService {
         dto.setIsRequired(entity.getIsRequired());
         dto.setDefaultValue(entity.getDefaultValue());
 
+        // Since validationRules is already a Map, we can set it directly
         if (entity.getValidationRules() != null) {
-            try {
-                Map<String, Object> rules = objectMapper.readValue(
-                        entity.getValidationRules(),
-                        new TypeReference<Map<String, Object>>() {}
-                );
-                dto.setValidationRules(rules);
-            } catch (Exception e) {
-                log.error("Error parsing validation rules for parameter {}: {}",
-                        entity.getParameterId(), e.getMessage());
-            }
+            dto.setValidationRules(entity.getValidationRules());
         }
 
         return dto;
@@ -716,14 +816,9 @@ public class ReportDesignerService {
         entity.setIsRequired(dto.getIsRequired());
         entity.setDefaultValue(dto.getDefaultValue());
 
+        // Set validation rules directly as it's already a Map
         if (dto.getValidationRules() != null) {
-            try {
-                String validationRulesJson = objectMapper.writeValueAsString(dto.getValidationRules());
-                entity.setValidationRules(validationRulesJson);
-            } catch (Exception e) {
-                log.error("Error converting validation rules to JSON: {}", e.getMessage());
-                throw new ReportCreationException("Failed to create parameter validation rules", e);
-            }
+            entity.setValidationRules(dto.getValidationRules());
         }
 
         return entity;

@@ -1,13 +1,10 @@
 package com.dair.cais.exception;
 
-import com.dair.cais.connection.DecryptionException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import net.snowflake.client.jdbc.internal.org.bouncycastle.openssl.EncryptionException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -50,22 +47,4 @@ public class GlobalExceptionHandler {
     }
 
     // ... (rest of the exception handlers remain the same)
-
-    @ExceptionHandler(DecryptionException.class)
-    public ResponseEntity<Map<String, String>> handleDecryptionException(DecryptionException ex) {
-        log.error("Decryption error occurred: {}", ex.getMessage(), ex);
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", "Failed to decrypt data");
-        errorResponse.put("details", ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(EncryptionException.class)
-    public ResponseEntity<Map<String, String>> handleEncryptionException(EncryptionException ex) {
-        log.error("Encryption error occurred: {}", ex.getMessage(), ex);
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", "Failed to encrypt data");
-        errorResponse.put("details", ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
 }

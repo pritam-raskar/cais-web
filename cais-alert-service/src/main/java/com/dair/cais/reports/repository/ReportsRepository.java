@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface ReportsRepository extends JpaRepository<ReportsEntity, Integer>  {
@@ -52,4 +53,19 @@ public interface ReportsRepository extends JpaRepository<ReportsEntity, Integer>
             @Param("status") String status,
             @Param("isPublished") Boolean isPublished,
             @Param("searchTerm") String searchTerm);
+
+    @Query("""
+        SELECT NEW map(
+            COUNT(r) as totalReports,
+            SUM(CASE WHEN r.isPublished = true THEN 1 ELSE 0 END) as publishedReports,
+            SUM(CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END) as draftReports,
+            SUM(CASE WHEN r.status = 'ARCHIVED' THEN 1 ELSE 0 END) as archivedReports,
+            MAX(r.updatedAt) as lastUpdated
+        )
+        FROM ReportsEntity r
+    """)
+    Map<String, Object> getReportStatistics();
+
+    @Query("SELECT r FROM ReportsEntity r ORDER BY r.updatedAt DESC")
+    List<ReportsEntity> findAllReportsBasicInfo();
 }

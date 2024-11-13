@@ -1,19 +1,29 @@
 package com.dair.cais.reports;
 
 import com.dair.cais.reports.dto.*;
+import com.dair.cais.reports.exception.ReportRetrievalException;
+import com.dair.cais.reports.mapper.ReportSummaryMapper;
+import com.dair.cais.reports.repository.ReportsRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -23,6 +33,32 @@ import java.util.Map;
 public class ReportDesignerController {
     private final ReportDesignerService reportService;
     private final ReportMetadataService metadataService;
+    private final ReportsRepository reportRepository;
+    private final ReportSummaryMapper reportSummaryMapper;
+
+    /**
+     * Get all reports
+     */
+    @Operation(summary = "Get all reports",
+            description = "Retrieves all available reports without pagination")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved all reports",
+                    content = @Content(schema = @Schema(implementation = List.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error occurred")
+    })
+    @GetMapping
+    public ResponseEntity<List<ReportDto>> getAllReports() {
+        log.debug("REST request to get all reports");
+
+        try {
+            List<ReportDto> reports = reportService.getAllReports();
+            log.debug("Retrieved {} reports successfully", reports.size());
+            return ResponseEntity.ok(reports);
+        } catch (Exception e) {
+            log.error("Failed to retrieve reports", e);
+            throw new ReportRetrievalException("Failed to retrieve reports", e);
+        }
+    }
 
     @Operation(summary = "Create new report")
     @PostMapping
@@ -160,6 +196,53 @@ public class ReportDesignerController {
             @PathVariable String schemaName) {
         log.info("REST request to get schema details: {}", schemaName);
         return ResponseEntity.ok(metadataService.getSchemaDetails(connectionId, schemaName));
+    }
+
+    @Operation(summary = "Get all reports with metadata",
+            description = "Retrieves a list of all reports with basic information and system-wide report statistics")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved reports",
+            content = @Content(schema = @Schema(implementation = ReportListResponseDto.class)))
+    @ApiResponse(responseCode = "500", description = "Internal server error occurred")
+    @GetMapping("/summary")
+    public ResponseEntity<ReportListResponseDto> getReportsSummary() {
+        log.debug("REST request to get all reports summary");
+
+        try {
+            // Get report statistics
+            Map<String, Object> stats = reportRepository.getReportStatistics();
+
+            // Build metadata
+            ReportMetadataStatsDto metadata = ReportMetadataStatsDto.builder()
+                    .totalReports(((Number) stats.get("totalReports")).longValue())
+                    .publishedReports(((Number) stats.get("publishedReports")).longValue())
+                    .draftReports(((Number) stats.get("draftReports")).longValue())
+                    .archivedReports(((Number) stats.get("archivedReports")).longValue())
+                    .lastUpdated((ZonedDateTime) stats.get("lastUpdated"))
+                    .build();
+
+            // Get all reports and map to summary DTOs
+            List<ReportSummaryDto> reports = reportRepository.findAllReportsBasicInfo()
+                    .stream()
+                    .map(reportSummaryMapper::toSummaryDto)
+                    .toList();
+
+            // Build final response
+            ReportListResponseDto response = ReportListResponseDto.builder()
+                    .reports(reports)
+                    .metadata(metadata)
+                    .build();
+
+            log.debug("Retrieved {} reports with metadata", reports.size());
+
+            // Return response with cache control
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES))
+                    .body(response);
+
+        } catch (Exception e) {
+            log.error("Failed to retrieve reports summary", e);
+            throw new ReportRetrievalException("Failed to retrieve reports summary", e);
+        }
     }
 }
 

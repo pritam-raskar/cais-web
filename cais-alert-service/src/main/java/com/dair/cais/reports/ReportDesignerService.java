@@ -39,6 +39,35 @@ public class ReportDesignerService {
     private final ReportParameterRepository parameterRepository;  // Add this
 
 
+    /**
+     * Get all reports
+     *
+     * @return List of all reports
+     * @throws ReportRetrievalException if there's an error retrieving reports
+     */
+    @Transactional(readOnly = true)
+    public List<ReportDto> getAllReports() {
+        log.debug("Getting all reports");
+
+        try {
+            List<ReportsEntity> reports = reportRepository.findAll();
+
+            return reports.stream()
+                    .map(report -> {
+                        List<ReportColumnEntity> columns =
+                                columnRepository.findByReportIdOrderBySortPriorityAsc(report.getReportId());
+                        List<ReportParameterEntity> parameters =
+                                parameterRepository.findByReportId(report.getReportId());
+                        return mapToDto(report, columns, parameters);
+                    })
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Error retrieving all reports", e);
+            throw new ReportRetrievalException("Failed to retrieve reports", e);
+        }
+    }
+
     @Transactional
     public ReportDto createReport(ReportCreateDto createDto) {
         log.info("Creating new report with identifier: {}", createDto.getReportIdentifier());

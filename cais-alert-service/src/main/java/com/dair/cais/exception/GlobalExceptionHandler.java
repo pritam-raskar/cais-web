@@ -1,5 +1,6 @@
 package com.dair.cais.exception;
 
+import com.dair.cais.reports.exception.ReportRetrievalException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -7,8 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.WebRequest;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -46,5 +50,30 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    // ... (rest of the exception handlers remain the same)
+
+    /**
+     * Handles ReportRetrievalException and returns a standardized error response.
+     *
+     * @param ex the ReportRetrievalException
+     * @param request the current web request
+     * @return ResponseEntity containing error details
+     */
+    @ExceptionHandler(ReportRetrievalException.class)
+    public ResponseEntity<Object> handleReportRetrievalException(
+            ReportRetrievalException ex,
+            WebRequest request) {
+
+        log.error("Report retrieval failed", ex);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Report Retrieval Error");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(body);
+    }
 }

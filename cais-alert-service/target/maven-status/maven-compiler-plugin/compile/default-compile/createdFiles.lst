@@ -26,6 +26,7 @@ com/dair/cais/connection/ConnectionType.class
 com/dair/cais/alert/AlertService.class
 com/dair/cais/reports/dto/SchemaUpdateDto.class
 com/dair/cais/alert/AlertValidationException.class
+com/dair/cais/reports/dto/ReportMetadataStatsDto.class
 com/dair/cais/reports/BaseEntity.class
 com/dair/cais/access/PolicyEntityMapping/PolicyEntityMappingEntity.class
 com/dair/cais/access/permission/AsyncPermissionRefreshService.class
@@ -77,6 +78,7 @@ com/dair/cais/steps/StepStatusRepository.class
 com/dair/cais/common/config/CaisAlertConstants.class
 com/dair/cais/access/organizationUnit/OrgUnitEntity.class
 com/dair/cais/reports/dto/ConditionalFormatDto.class
+com/dair/cais/reports/exception/ReportRetrievalException.class
 com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingService.class
 com/dair/cais/hierarchy/HierarchyMapper.class
 com/dair/cais/attachment/AttachmentRepository.class
@@ -109,6 +111,7 @@ com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingEntity.class
 com/dair/cais/access/user/JwtConfig.class
 com/dair/cais/organization/OrganizationFamily.class
 com/dair/cais/connection/metadata/ConnectionMetadata.class
+com/dair/cais/reports/dto/ReportMetadataStatsDto$ReportMetadataStatsDtoBuilder.class
 com/dair/cais/access/user/LoginRequest.class
 com/dair/cais/note/NoteService.class
 com/dair/cais/communication/CommunicationService.class
@@ -123,6 +126,7 @@ com/dair/cais/access/policy/PolicyInUseException.class
 com/dair/cais/reports/constant/ReportConstants$SortDirection.class
 com/dair/cais/access/policy/PolicyController.class
 com/dair/cais/hierarchy/HierarchyController.class
+com/dair/cais/reports/dto/ReportSummaryDto$ReportSummaryDtoBuilder.class
 com/dair/cais/hierarchy/HierarchyRepository.class
 com/dair/cais/access/alertType/alertTypeController1.class
 com/dair/cais/alert/AlertMapper.class
@@ -182,6 +186,8 @@ com/dair/cais/access/user/UserStatusUpdateRequest.class
 com/dair/cais/alert/AlertEntity.class
 com/dair/cais/connection/ConnectionService$1.class
 com/dair/cais/connector/ConnectorService$1.class
+com/dair/cais/reports/dto/ReportListResponseDto$ReportListResponseDtoBuilder.class
+com/dair/cais/reports/mapper/ReportSummaryMapper.class
 com/dair/cais/organization/OrganizationFamilyEntity.class
 com/dair/cais/access/user/JwtService$TokenValidationResult.class
 com/dair/cais/access/RolePolicyMapping/RolesPolicyMappingService.class
@@ -221,6 +227,8 @@ com/dair/cais/reports/exception/ReportExecutionException.class
 com/dair/cais/organization/OrganizationFamilyController.class
 com/dair/cais/connector/ConnectorController.class
 com/dair/cais/access/PolicyAlertMapping/PolicyAlertTypeActionMappingService.class
+com/dair/cais/reports/dto/ReportSummaryDto.class
+com/dair/cais/reports/dto/ReportListResponseDto.class
 com/dair/cais/access/user/SecurityConfig.class
 com/dair/cais/communication/Communication.class
 com/dair/cais/access/Role/RoleMapper.class

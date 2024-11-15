@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Data
@@ -46,5 +47,37 @@ public class Alert extends CaisBaseModel {
     private Map<String, Object> reasonDetails;
     private Map<String, Object> customFields;
     private Map<String, Object> workflowInfo;
+
+    // Additional fields
+    private String pivot;
+    private String accountId;
+    private String transactionId;
+    private String customerId;
+    private String houseHoldId;
+    private String priority;
+    private String tag;
+    private String branchId;
+    private String representativeId;
+    private String buildingBlock;
+    private String watchListId;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // Add getters and setters for these fields
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
 }

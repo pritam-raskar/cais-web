@@ -1,6 +1,10 @@
 package com.dair.cais.reports.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -10,6 +14,10 @@ import java.util.Map;
  * DTO for report execution results
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ReportExecutionResultDto {
     private Integer reportId;
     private String reportName;
@@ -18,4 +26,17 @@ public class ReportExecutionResultDto {
     private Integer totalRows;
     private Boolean isCached;
     private ZonedDateTime executionTime;
+    private ExecutionMetadata metadata;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExecutionMetadata {
+        private Long executionTimeMs;
+        private String queryString;
+        private Integer returnedRows;
+        private Integer filteredRows;
+        private ZonedDateTime cacheExpiry;
+    }
 }

@@ -363,8 +363,8 @@ public class AlertRepository {
     }
 
     public List<AlertEntity> getAllAlerts(String name, String state, List<String> accountNumbers,
-            List<String> owners, List<String> assignees, Date createdDateFrom, Date createdDateTo, int offset,
-            int limit) {
+                                          List<String> owners, List<String> assignees, Date createdDateFrom, Date createdDateTo, int offset,
+                                          int limit) {
         final Query query = new Query();
         final List<Criteria> criteria = new ArrayList<>();
 

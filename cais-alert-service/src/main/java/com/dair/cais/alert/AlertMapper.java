@@ -1,14 +1,19 @@
 package com.dair.cais.alert;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
+@RequiredArgsConstructor
 public class AlertMapper {
-
+    private final ObjectMapper objectMapper;
 
     public Alert toModel(AlertEntity entity) {
         Alert alert = new Alert();
-        alert.setId(String.valueOf(entity.getId()));;
+        alert.setId(String.valueOf(entity.getId()));
         alert.setAlertId(entity.getAlertId());
         alert.setCreateDate(entity.getCreateDate());
         alert.setLastUpdateDate(entity.getLastUpdateDate());
@@ -40,6 +45,23 @@ public class AlertMapper {
         alert.setCustomFields(entity.getCustomFields());
         alert.setWorkflowInfo(entity.getWorkflowInfo());
 
+        // Additional fields
+        alert.setPivot(entity.getPivot());
+        alert.setAccountId(entity.getAccountId());
+        alert.setTransactionId(entity.getTransactionId());
+        alert.setCustomerId(entity.getCustomerId());
+        alert.setHouseHoldId(entity.getHouseHoldId());
+        alert.setPriority(entity.getPriority());
+        alert.setTag(entity.getTag());
+        alert.setBranchId(entity.getBranchId());
+        alert.setRepresentativeId(entity.getRepresentativeId());
+        alert.setBuildingBlock(entity.getBuildingBlock());
+        alert.setWatchListId(entity.getWatchListId());
+
+        // Audit timestamps
+        alert.setCreatedAt(entity.getCreatedAt());
+        alert.setUpdatedAt(entity.getUpdatedAt());
+
         return alert;
     }
 
@@ -47,7 +69,6 @@ public class AlertMapper {
         AlertEntity alertEntity = new AlertEntity();
         alertEntity.setId(alert.getId());
         mapAlertToEntity(alert, alertEntity);
-
         return alertEntity;
     }
 
@@ -55,9 +76,7 @@ public class AlertMapper {
         AlertEntity alertEntity = new AlertEntity();
         alertEntity.setId(alertId);
         mapAlertToEntity(alert, alertEntity);
-
         return alertEntity;
-
     }
 
     private void mapAlertToEntity(Alert alert, AlertEntity alertEntity) {
@@ -92,21 +111,25 @@ public class AlertMapper {
         alertEntity.setCustomFields(alert.getCustomFields());
         alertEntity.setWorkflowInfo(alert.getWorkflowInfo());
 
+        // Additional fields
+        alertEntity.setPivot(alert.getPivot());
+        alertEntity.setAccountId(alert.getAccountId());
+        alertEntity.setTransactionId(alert.getTransactionId());
+        alertEntity.setCustomerId(alert.getCustomerId());
+        alertEntity.setHouseHoldId(alert.getHouseHoldId());
+        alertEntity.setPriority(alert.getPriority());
+        alertEntity.setTag(alert.getTag());
+        alertEntity.setBranchId(alert.getBranchId());
+        alertEntity.setRepresentativeId(alert.getRepresentativeId());
+        alertEntity.setBuildingBlock(alert.getBuildingBlock());
+        alertEntity.setWatchListId(alert.getWatchListId());
 
-//        alertEntity.setName(alert.getName());
-//        alertEntity.setType(alert.getType());
-//        alertEntity.setAccountNumber(alert.getAccountNumber());
-//        alertEntity.setBusinessUnit(alert.getBusinessUnit());
-//        alertEntity.setBusinessUnitFamily(alert.getBusinessUnitFamily());
-//        alertEntity.setBusinessUnitFamilyPrevious(alert.getBusinessUnitFamilyPrevious());
-//        alertEntity.setDetails(alert.getDetails());
-//        alertEntity.setScore(alert.getScore());
-//        alertEntity.setState(alert.getState());
-//        alertEntity.setFocusDetails(alert.getFocusDetails());
-//        alertEntity.setCustomFields(alert.getCustomFields());
-//        alertEntity.setWorkflowInfo(alert.getWorkflowInfo());
-//
-//        alertEntity.setCreatedDate(alert.getCreatedDate());
+        // Audit timestamps
+        if (alert.getCreatedAt() != null) {
+            alertEntity.setCreatedAt(alert.getCreatedAt());
+        }
+        if (alert.getUpdatedAt() != null) {
+            alertEntity.setUpdatedAt(alert.getUpdatedAt());
+        }
     }
-
 }

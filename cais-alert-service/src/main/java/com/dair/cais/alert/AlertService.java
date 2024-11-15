@@ -1,6 +1,9 @@
 package com.dair.cais.alert;
 
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
+import com.dair.cais.alert.rdbms.RdbmsAlertEntity;
+import com.dair.cais.alert.rdbms.RdbmsAlertMapper;
+import com.dair.cais.alert.rdbms.RdbmsAlertRepository;
 import com.dair.cais.audit.AuditLogRequest;
 import com.dair.cais.audit.AuditTrailService;
 import com.dair.cais.common.config.CaisAlertConstants;
@@ -11,6 +14,7 @@ import com.dair.cais.steps.StepStatusRepository;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -20,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import javax.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -30,10 +34,12 @@ import java.util.stream.Collectors;
 @Transactional
 public class AlertService {
    private final AlertMapper alertMapper;
+   private final RdbmsAlertMapper rdbmsAlertMapper;
    private final StepRepository stepsRepository;
    private final StepStatusRepository stepStatusRepository;
    private final MongoTemplate mongoTemplate;
    private final AlertRepository alertRepository;
+   private final RdbmsAlertRepository rdbmsAlertRepository;
    private final AuditTrailService auditTrailService;
    private final UserPermissionService userPermissionService;
 
@@ -162,12 +168,31 @@ public class AlertService {
       return alerts;
    }
 
-   // Alert Update Operations
+   @Transactional
    public Alert updateTotalScore(String alertId, int totalScore) {
-      log.debug("Updating total score for alert: {} to {}", alertId, totalScore);
-      return alertRepository.updateTotalScore(alertId, totalScore);
+      log.debug("Starting synchronized total score update for alertId: {}", alertId);
+      try {
+         // Update MongoDB
+         Alert updatedMongoAlert = alertRepository.updateTotalScore(alertId, totalScore);
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    entity.setTotalScore((double) totalScore);
+                    entity.setLastUpdateDate(LocalDateTime.now());
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully updated total score in both databases for alertId: {}", alertId);
+         return updatedMongoAlert;
+      } catch (Exception e) {
+         log.error("Failed to update total score for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to update total score in databases", e);
+      }
    }
 
+   @Transactional
    public Alert updateTotalScoreWithAudit(String alertId, int totalScore, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
       Alert updatedAlert = updateTotalScore(alertId, totalScore);
@@ -189,11 +214,31 @@ public class AlertService {
       return updatedAlert;
    }
 
+   @Transactional
    public Alert updateOwnerId(String alertId, String ownerId) {
-      log.debug("Updating owner for alert: {} to {}", alertId, ownerId);
-      return alertRepository.updateOwnerId(alertId, ownerId);
+      log.debug("Starting synchronized owner update for alertId: {}", alertId);
+      try {
+         // Update MongoDB
+         Alert updatedMongoAlert = alertRepository.updateOwnerId(alertId, ownerId);
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    entity.setOwnerId(ownerId);
+                    entity.setLastUpdateDate(LocalDateTime.now());
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully updated owner in both databases for alertId: {}", alertId);
+         return updatedMongoAlert;
+      } catch (Exception e) {
+         log.error("Failed to update owner for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to update owner in databases", e);
+      }
    }
 
+   @Transactional
    public Alert updateOwnerIdWithAudit(String alertId, String ownerId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
       Alert updatedAlert = updateOwnerId(alertId, ownerId);
@@ -215,11 +260,32 @@ public class AlertService {
       return updatedAlert;
    }
 
+   @Transactional
    public Alert updateOrgUnitId(String alertId, String orgUnitId) {
-      log.debug("Updating org unit for alert: {} to {}", alertId, orgUnitId);
-      return alertRepository.updateOrgUnitId(alertId, orgUnitId);
+      log.debug("Starting synchronized org unit update for alertId: {}", alertId);
+      try {
+         // Update MongoDB
+         Alert updatedMongoAlert = alertRepository.updateOrgUnitId(alertId, orgUnitId);
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    entity.setPreviousOrgUnitId(entity.getOrgUnitId());
+                    entity.setOrgUnitId(orgUnitId);
+                    entity.setLastUpdateDate(LocalDateTime.now());
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully updated org unit in both databases for alertId: {}", alertId);
+         return updatedMongoAlert;
+      } catch (Exception e) {
+         log.error("Failed to update org unit for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to update org unit in databases", e);
+      }
    }
 
+   @Transactional
    public Alert updateOrgUnitIdWithAudit(String alertId, String orgUnitId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
       Alert updatedAlert = updateOrgUnitId(alertId, orgUnitId);
@@ -241,11 +307,31 @@ public class AlertService {
       return updatedAlert;
    }
 
+   @Transactional
    public Alert updateStatus(String alertId, String statusId) {
-      log.debug("Updating status for alert: {} to {}", alertId, statusId);
-      return alertRepository.updateStatus(alertId, statusId);
+      log.debug("Starting synchronized status update for alertId: {}", alertId);
+      try {
+         // Update MongoDB
+         Alert updatedMongoAlert = alertRepository.updateStatus(alertId, statusId);
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    entity.setStatus(statusId);
+                    entity.setLastUpdateDate(LocalDateTime.now());
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully updated status in both databases for alertId: {}", alertId);
+         return updatedMongoAlert;
+      } catch (Exception e) {
+         log.error("Failed to update status for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to update status in databases", e);
+      }
    }
 
+   @Transactional
    public Alert updateStatusWithAudit(String alertId, String statusId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
       Alert updatedAlert = updateStatus(alertId, statusId);
@@ -266,26 +352,45 @@ public class AlertService {
 
       return updatedAlert;
    }
-   // Step Management Operations
+
+   @Transactional
    public Alert changeStep(String alertId, Long stepId) {
-      log.debug("Changing step for alert: {} to step: {}", alertId, stepId);
-      Step step = stepsRepository.findByStepId(stepId);
-      if (step == null) {
-         throw new CaisNotFoundException("Step not found with id: " + stepId);
-      }
+      log.debug("Starting synchronized step change for alertId: {} to step: {}", alertId, stepId);
+      try {
+         Step step = stepsRepository.findByStepId(stepId);
+         if (step == null) {
+            throw new CaisNotFoundException("Step not found with id: " + stepId);
+         }
 
-      StepStatus stepStatus = stepStatusRepository.findByStepStatusId(step.getStepStatusId());
-      if (stepStatus == null) {
-         throw new CaisNotFoundException("Step status not found for step id: " + stepId);
-      }
+         StepStatus stepStatus = stepStatusRepository.findByStepStatusId(step.getStepStatusId());
+         if (stepStatus == null) {
+            throw new CaisNotFoundException("Step status not found for step id: " + stepId);
+         }
 
-      AlertEntity updatedEntity = alertRepository.changeStep(alertId, stepId, step.getStepName(), stepStatus.getStepName());
-      if (updatedEntity == null) {
-         throw new CaisNotFoundException("Alert not found with id: " + alertId);
+         // Update MongoDB
+         AlertEntity updatedMongoEntity = alertRepository.changeStep(alertId, stepId,
+                 step.getStepName(), stepStatus.getStepName());
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    entity.setAlertStepId(stepId.toString());
+                    entity.setAlertStepName(step.getStepName());
+                    entity.setStatus(stepStatus.getStepName());
+                    entity.setLastUpdateDate(LocalDateTime.now());
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully changed step in both databases for alertId: {}", alertId);
+         return alertMapper.toModel(updatedMongoEntity);
+      } catch (Exception e) {
+         log.error("Failed to change step for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to change step in databases", e);
       }
-      return alertMapper.toModel(updatedEntity);
    }
 
+   @Transactional
    public Alert changeStepWithAudit(String alertId, Long stepId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
       Alert updatedAlert = changeStep(alertId, stepId);
@@ -403,15 +508,60 @@ public class AlertService {
 
       return response;
    }
-
+   @Transactional
    public Alert patchAlert(String alertId, String alertType, Alert alert) {
-      log.debug("Patching alert: {} of type: {}", alertId, alertType);
-      AlertEntity upsertedAlert = alertRepository.patchAlert(alertMapper.toEntity(alertId, alert), alertType);
-      return alertMapper.toModel(upsertedAlert);
+      log.debug("Starting synchronized patch for alertId: {}", alertId);
+      try {
+         // Update MongoDB
+         AlertEntity updatedMongoEntity = alertRepository.patchAlert(alertMapper.toEntity(alertId, alert), alertType);
+
+         // Update RDBMS
+         rdbmsAlertRepository.findByAlertId(alertId)
+                 .map(entity -> {
+                    // Update all non-null fields from alert to entity
+                    if (alert.getCreateDate() != null) entity.setCreateDate(LocalDateTime.parse(alert.getCreateDate()));
+                    if (alert.getLastUpdateDate() != null)
+                       entity.setLastUpdateDate(LocalDateTime.parse(alert.getLastUpdateDate()));
+                    if (alert.getTotalScore() != null) entity.setTotalScore(alert.getTotalScore().doubleValue());
+                    if (alert.getBusinessDate() != null)
+                       entity.setBusinessDate(LocalDateTime.parse(alert.getBusinessDate()));
+                    if (alert.getFocalEntity() != null) entity.setFocalEntity(alert.getFocalEntity());
+                    if (alert.getFocus() != null) entity.setFocus(alert.getFocus());
+                    if (alert.getAlertTypeId() != null) entity.setAlertTypeId(alert.getAlertTypeId());
+                    if (alert.getAlertRegion() != null) entity.setAlertRegion(alert.getAlertRegion());
+                    if (alert.getAlertGroupId() != null) entity.setAlertGroupId(alert.getAlertGroupId());
+                    if (alert.getIsConsolidated() != null) entity.setIsConsolidated(alert.getIsConsolidated());
+                    if (alert.getIsActive() != null) entity.setIsActive(alert.getIsActive());
+                    if (alert.getHasMultipleScenario() != null)
+                       entity.setHasMultipleScenario(alert.getHasMultipleScenario());
+                    if (alert.getIsDeleted() != null) entity.setIsDeleted(alert.getIsDeleted());
+                    if (alert.getOrgUnitId() != null) entity.setOrgUnitId(alert.getOrgUnitId());
+                    if (alert.getOrgFamily() != null) entity.setOrgFamily(alert.getOrgFamily());
+                    if (alert.getPreviousOrgUnitId() != null) entity.setPreviousOrgUnitId(alert.getPreviousOrgUnitId());
+                    if (alert.getIsOrgUnitUpdated() != null) entity.setIsOrgUnitUpdated(alert.getIsOrgUnitUpdated());
+                    if (alert.getIsRelatedAlert() != null) entity.setIsRelatedAlert(alert.getIsRelatedAlert());
+                    if (alert.getOwnerId() != null) entity.setOwnerId(alert.getOwnerId());
+                    if (alert.getOwnerName() != null) entity.setOwnerName(alert.getOwnerName());
+                    if (alert.getStatus() != null) entity.setStatus(alert.getStatus());
+                    if (alert.getAlertStepId() != null) entity.setAlertStepId(alert.getAlertStepId());
+                    if (alert.getAlertStepName() != null) entity.setAlertStepName(alert.getAlertStepName());
+                    if (alert.getIsCaseCreated() != null) entity.setIsCaseCreated(alert.getIsCaseCreated());
+                    if (alert.getDetails() != null) entity.setDetails(alert.getDetails());
+
+                    return rdbmsAlertRepository.save(entity);
+                 })
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+         log.debug("Successfully patched alert in both databases for alertId: {}", alertId);
+         return alertMapper.toModel(updatedMongoEntity);
+      } catch (Exception e) {
+         log.error("Failed to patch alert for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to patch alert in databases", e);
+      }
    }
 
-   public Alert patchAlertWithAudit(String alertId, String alertType, Alert alert,
-                                    AuditLogRequest auditLogRequest) {
+   @Transactional
+   public Alert patchAlertWithAudit(String alertId, String alertType, Alert alert, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertById(alertId, alertType);
       Alert updatedAlert = patchAlert(alertId, alertType, alert);
 
@@ -432,14 +582,27 @@ public class AlertService {
       return updatedAlert;
    }
 
+   @Transactional
    public void deleteAlertById(String alertId, String alertType) {
-      log.debug("Deleting alert: {} of type: {}", alertId, alertType);
-      AlertEntity alertById = alertRepository.deleteAlertById(alertId, alertType);
-      if (alertById == null) {
-         throw new CaisNotFoundException("Alert not found with id: " + alertId);
+      log.debug("Starting synchronized deletion for alertId: {}", alertId);
+      try {
+         // Delete from MongoDB
+         AlertEntity deletedMongoAlert = alertRepository.deleteAlertById(alertId, alertType);
+         if (deletedMongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+
+         // Delete from RDBMS
+         rdbmsAlertRepository.deleteByAlertId(alertId);
+
+         log.debug("Successfully deleted alert from both databases for alertId: {}", alertId);
+      } catch (Exception e) {
+         log.error("Failed to delete alert for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to delete alert from databases", e);
       }
    }
 
+   @Transactional
    public void deleteAlertByIdWithAudit(String alertId, String alertType, AuditLogRequest auditLogRequest) {
       Alert alertToDelete = getAlertById(alertId, alertType);
       deleteAlertById(alertId, alertType);
@@ -457,14 +620,27 @@ public class AlertService {
               auditLogRequest.getOldValue(),
               auditLogRequest.getNewValue());
    }
-   // Bulk Operations
+
+   @Transactional
    public List<Alert> createAlerts(List<Alert> alerts) {
-      log.debug("Creating {} bulk alerts", alerts.size());
-      return alerts.stream()
-              .map(this::createAlert)
-              .collect(Collectors.toList());
+      log.debug("Starting synchronized creation of {} alerts", alerts.size());
+      try {
+         List<Alert> createdAlerts = new ArrayList<>();
+         for (Alert alert : alerts) {
+            LocalDateTime now = LocalDateTime.now();
+            alert.setCreatedAt(now);
+            alert.setUpdatedAt(now);
+            createdAlerts.add(createAlert(alert));
+         }
+         log.debug("Successfully created {} alerts in both databases", alerts.size());
+         return createdAlerts;
+      } catch (Exception e) {
+         log.error("Failed to create alerts in batch", e);
+         throw new RuntimeException("Failed to create alerts in databases", e);
+      }
    }
 
+   @Transactional
    public List<Alert> createAlertsWithAudit(List<Alert> alerts, AuditLogRequest auditLogRequest) {
       List<Alert> createdAlerts = createAlerts(alerts);
 
@@ -483,19 +659,42 @@ public class AlertService {
       return createdAlerts;
    }
 
+   @Transactional
    public Alert createAlert(Alert alert) {
-      log.debug("Creating new alert");
+      log.debug("Starting synchronized alert creation for alertId: {}", alert.getAlertId());
       List<String> validationErrors = validateAlert(alert);
       if (!validationErrors.isEmpty()) {
+         log.error("Validation failed for alert: {}", alert.getAlertId());
          throw new AlertValidationException("Alert validation failed", validationErrors);
       }
 
-      AlertEntity alertEntity = alertMapper.toEntity(alert);
-      AlertEntity upsertedAlert = alertRepository.createUpsertAlert(alertEntity);
-      return alertMapper.toModel(upsertedAlert);
+      try {
+         // Create in MongoDB
+         LocalDateTime now = LocalDateTime.now();
+         alert.setCreateDate(String.valueOf(now));
+         alert.setLastUpdateDate(String.valueOf(now));
+         alert.setCreatedAt(now);
+         alert.setUpdatedAt(now);
+         AlertEntity mongoEntity = alertMapper.toEntity(alert);
+         AlertEntity savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
+
+         // Create in RDBMS
+         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(alert);
+         rdbmsAlertRepository.save(rdbmsEntity);
+
+         log.debug("Successfully created alert in both databases for alertId: {}", alert.getAlertId());
+         return alertMapper.toModel(savedMongoEntity);
+      } catch (Exception e) {
+         log.error("Failed to create alert: {}", alert.getAlertId(), e);
+         throw new RuntimeException("Failed to create alert in databases", e);
+      }
    }
 
+   @Transactional
    public Alert createAlertWithAudit(Alert alert, AuditLogRequest auditLogRequest) {
+      LocalDateTime now = LocalDateTime.now();
+      alert.setCreatedAt(now);
+      alert.setUpdatedAt(now);
       Alert createdAlert = createAlert(alert);
 
       auditLogRequest.setAffectedItemType("Alert");
@@ -542,7 +741,6 @@ public class AlertService {
       return alert;
    }
 
-   // Validation Methods
    private List<String> validateAlert(Alert alert) {
       List<String> errors = new ArrayList<>();
 
@@ -560,6 +758,12 @@ public class AlertService {
       }
       if (!StringUtils.hasText(alert.getFocalEntity())) {
          errors.add("Focal entity is required");
+      }
+      if (!StringUtils.hasText(alert.getOrgUnitId())) {
+         errors.add("Org Unit is required");
+      }
+      if (!StringUtils.hasText(alert.getOrgFamily())) {
+         errors.add("Org Family is required");
       }
       if (!StringUtils.hasText(alert.getFocus())) {
          errors.add("Focus is required");
@@ -619,9 +823,6 @@ public class AlertService {
 
 
 
-
-//
-//
 //package com.dair.cais.alert;
 //
 //import com.dair.cais.access.UserBasedPermission.UserPermissionService;
@@ -635,12 +836,13 @@ public class AlertService {
 //import com.dair.exception.CaisBaseException;
 //import com.dair.exception.CaisIllegalArgumentException;
 //import com.dair.exception.CaisNotFoundException;
+//import lombok.RequiredArgsConstructor;
 //import lombok.extern.slf4j.Slf4j;
-//import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.data.mongodb.core.MongoTemplate;
 //import org.springframework.data.mongodb.core.query.Criteria;
 //import org.springframework.data.mongodb.core.query.Query;
 //import org.springframework.stereotype.Service;
+//import org.springframework.transaction.annotation.Transactional;
 //import org.springframework.util.StringUtils;
 //
 //import javax.validation.Valid;
@@ -649,36 +851,28 @@ public class AlertService {
 //
 //@Service
 //@Slf4j
+//@RequiredArgsConstructor
+//@Transactional
 //public class AlertService {
+//   private final AlertMapper alertMapper;
+//   private final StepRepository stepsRepository;
+//   private final StepStatusRepository stepStatusRepository;
+//   private final MongoTemplate mongoTemplate;
+//   private final AlertRepository alertRepository;
+//   private final AuditTrailService auditTrailService;
+//   private final UserPermissionService userPermissionService;
 //
-//   @Autowired
-//   private AlertMapper alertMapper;
-//
-//   @Autowired
-//   private StepRepository stepsRepository;
-//
-//   @Autowired
-//   private StepStatusRepository stepStatusRepository;
-//
-//   @Autowired
-//   private MongoTemplate mongoTemplate;
-//
-//   @Autowired
-//   private AlertRepository alertRepository;
-//
-//   @Autowired
-//   private AuditTrailService auditTrailService;
-//
-//   @Autowired
-//   private UserPermissionService userPermissionService;
-//
-//
-//   public List<Alert> getAllActiveAlerts(AuditLogRequest auditLogRequest) {
-//      log.info("Fetching all active and non-deleted alerts");
+//   // Base Operations
+//   public List<Alert> getAllActiveAlerts() {
+//      log.debug("Fetching all active and non-deleted alerts");
 //      List<AlertEntity> activeAlertEntities = alertRepository.findAllActiveAndNonDeletedAlerts();
-//      List<Alert> activeAlerts = activeAlertEntities.stream()
+//      return activeAlertEntities.stream()
 //              .map(alertMapper::toModel)
 //              .collect(Collectors.toList());
+//   }
+//
+//   public List<Alert> getAllActiveAlertsWithAudit(AuditLogRequest auditLogRequest) {
+//      List<Alert> activeAlerts = getAllActiveAlerts();
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setDescription("Fetched all active and non-deleted alerts");
@@ -688,56 +882,96 @@ public class AlertService {
 //              auditLogRequest.getDescription(),
 //              auditLogRequest.getCategory(),
 //              auditLogRequest.getAffectedItemType(),
-//              null, // No specific affected item ID for this operation
-//              null, // No old value
+//              null,
+//              null,
 //              "Fetched " + activeAlerts.size() + " alerts");
 //
 //      return activeAlerts;
 //   }
 //
-//
-//   private Alert getAlertOnId(final String alertId) {
+//   // Alert Retrieval Operations
+//   public Alert getAlertOnId(final String alertId) {
+//      log.debug("Fetching alert with ID: {}", alertId);
 //      AlertEntity alertById = alertRepository.getAlertOnId(alertId);
 //      if (alertById == null) {
-//         throw new CaisNotFoundException();
+//         throw new CaisNotFoundException("Alert not found with ID: " + alertId);
 //      }
 //      return alertMapper.toModel(alertById);
-//
-//
 //   }
 //
 //   public Alert getAlertOnId(final String alertId, AuditLogRequest auditLogRequest) {
-//      AlertEntity alertById = alertRepository.getAlertOnId(alertId);
-//      if (alertById == null) {
-//         throw new CaisNotFoundException();
-//      }
-//      Alert alert = alertMapper.toModel(alertById);
+//      Alert alert = getAlertOnId(alertId);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              null,
+//              alert.toString());
 //
 //      return alert;
 //   }
 //
-//   public List<AlertEntity> findAlertsByOrgFamily(String searchstring, AuditLogRequest auditLogRequest) {
-//      List<AlertEntity> alerts = alertRepository.findAlertsByOrgFamily(searchstring);
+//   public List<AlertEntity> findAlertsByOrgFamily(String searchstring) {
+//      log.debug("Finding alerts by org family: {}", searchstring);
+//      return alertRepository.findAlertsByOrgFamily(searchstring);
+//   }
+//
+//   public List<AlertEntity> findAlertsByOrgFamilyWithAudit(String searchstring, AuditLogRequest auditLogRequest) {
+//      List<AlertEntity> alerts = findAlertsByOrgFamily(searchstring);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditLogRequest.setDescription("Searched alerts by org family: " + searchstring);
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              null,
+//              null,
+//              "Found " + alerts.size() + " alerts");
 //
 //      return alerts;
 //   }
 //
-//   public List<AlertEntity> findAlertsByOrgFamilyBYUserOrgKeys(String userId, AuditLogRequest auditLogRequest) {
-//      log.info("Fetching alerts for user: {}", userId);
+//   public List<AlertEntity> findAlertsByOrg(String searchstring) {
+//      log.debug("Finding alerts by org: {}", searchstring);
+//      return alertRepository.findAlertsByOrg(searchstring);
+//   }
 //
+//   public List<AlertEntity> findAlertsByOrgWithAudit(String searchstring, AuditLogRequest auditLogRequest) {
+//      List<AlertEntity> alerts = findAlertsByOrg(searchstring);
+//
+//      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setDescription("Searched alerts by org: " + searchstring);
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              null,
+//              null,
+//              "Found " + alerts.size() + " alerts");
+//
+//      return alerts;
+//   }
+//
+//   public List<AlertEntity> findAlertsByOrgFamilyByUserOrgKeys(String userId) {
+//      log.debug("Finding alerts for user: {}", userId);
 //      List<String> userOrgKeys = userPermissionService.getDistinctOrgKeysForUser(userId);
-//      List<AlertEntity> alertEntities = alertRepository.findAlertsByOrgFamilyBYUserOrgKeys(userOrgKeys);
+//      return alertRepository.findAlertsByOrgFamilyBYUserOrgKeys(userOrgKeys);
+//   }
+//
+//   public List<AlertEntity> findAlertsByOrgFamilyByUserOrgKeysWithAudit(String userId, AuditLogRequest auditLogRequest) {
+//      List<AlertEntity> alerts = findAlertsByOrgFamilyByUserOrgKeys(userId);
+//
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setDescription("Fetched alerts for user's org units");
 //      auditTrailService.logAction(auditLogRequest.getUserId(),
@@ -746,109 +980,120 @@ public class AlertService {
 //              auditLogRequest.getDescription(),
 //              auditLogRequest.getCategory(),
 //              auditLogRequest.getAffectedItemType(),
-//              null, // No specific affected item ID for this operation
-//              null, // No old value
-//              "Fetched " + alertEntities.size() + " alerts for user " + userId);
-//
-//      return alertEntities;
-//   }
-//
-//   public List<AlertEntity> findAlertsByOrg(String searchstring, AuditLogRequest auditLogRequest) {
-//      List<AlertEntity> alerts = alertRepository.findAlertsByOrg(searchstring);
-//
-//      auditLogRequest.setAffectedItemType("Alert");
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//              null,
+//              null,
+//              "Found " + alerts.size() + " alerts for user " + userId);
 //
 //      return alerts;
 //   }
 //
-//   public List<AlertEntity> findAlertsByCriteria(
-//           String alertId, String createDate, String lastUpdateDate, String totalScore,
-//           String createdBy, String businessDate, String focalEntity, String focus, String alertTypeId,
-//           String alertRegion, String alertGroupId, Boolean isConsolidated, Boolean isActive,
-//           Boolean hasMultipleScenario, Boolean isDeleted, String orgUnitId, String orgFamily,
-//           String previousOrgUnitId, Boolean isOrgUnitUpdated, Boolean isRelatedAlert, String ownerId,
-//           String ownerName, String status, String alertStepId, String alertStepName, Boolean isCaseCreated,
-//           AuditLogRequest auditLogRequest
-//   ) {
-//      List<AlertEntity> alerts = alertRepository.findAlertsByCriteria(
-//              alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate, focalEntity, focus,
-//              alertTypeId, alertRegion, alertGroupId, isConsolidated, isActive, hasMultipleScenario, isDeleted,
-//              orgUnitId, orgFamily, previousOrgUnitId, isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName,
-//              status, alertStepId, alertStepName, isCaseCreated
-//      );
-//
-//      auditLogRequest.setAffectedItemType("Alert");
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
-//
-//      return alerts;
+//   // Alert Update Operations
+//   public Alert updateTotalScore(String alertId, int totalScore) {
+//      log.debug("Updating total score for alert: {} to {}", alertId, totalScore);
+//      return alertRepository.updateTotalScore(alertId, totalScore);
 //   }
 //
-//   public Alert updateTotalScore(String alertId, int totalScore, AuditLogRequest auditLogRequest) {
-//      Alert oldAlert = getAlertOnId(alertId, auditLogRequest);
-//      Alert updatedAlert = alertRepository.updateTotalScore(alertId, totalScore);
+//   public Alert updateTotalScoreWithAudit(String alertId, int totalScore, AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertOnId(alertId);
+//      Alert updatedAlert = updateTotalScore(alertId, totalScore);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(oldAlert.getTotalScore().toString());
 //      auditLogRequest.setNewValue(String.valueOf(totalScore));
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
 //
-//   public Alert updateOwnerId(String alertId, String ownerId, AuditLogRequest auditLogRequest) {
-//      Alert oldAlert = getAlertOnId(alertId, auditLogRequest);
-//      Alert updatedAlert = alertRepository.updateOwnerId(alertId, ownerId);
+//   public Alert updateOwnerId(String alertId, String ownerId) {
+//      log.debug("Updating owner for alert: {} to {}", alertId, ownerId);
+//      return alertRepository.updateOwnerId(alertId, ownerId);
+//   }
+//
+//   public Alert updateOwnerIdWithAudit(String alertId, String ownerId, AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertOnId(alertId);
+//      Alert updatedAlert = updateOwnerId(alertId, ownerId);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(oldAlert.getOwnerId());
 //      auditLogRequest.setNewValue(ownerId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
 //
-//   public Alert updateOrgUnitId(String alertId, String orgUnitId, AuditLogRequest auditLogRequest) {
-//      Alert oldAlert = getAlertOnId(alertId, auditLogRequest);
-//      Alert updatedAlert = alertRepository.updateOrgUnitId(alertId, orgUnitId);
+//   public Alert updateOrgUnitId(String alertId, String orgUnitId) {
+//      log.debug("Updating org unit for alert: {} to {}", alertId, orgUnitId);
+//      return alertRepository.updateOrgUnitId(alertId, orgUnitId);
+//   }
+//
+//   public Alert updateOrgUnitIdWithAudit(String alertId, String orgUnitId, AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertOnId(alertId);
+//      Alert updatedAlert = updateOrgUnitId(alertId, orgUnitId);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(oldAlert.getOrgUnitId());
 //      auditLogRequest.setNewValue(orgUnitId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
 //
-//   public Alert updateStatus(String alertId, String statusId, AuditLogRequest auditLogRequest) {
-//      Alert oldAlert = getAlertOnId(alertId, auditLogRequest);
-//      Alert updatedAlert = alertRepository.updateStatus(alertId, statusId);
+//   public Alert updateStatus(String alertId, String statusId) {
+//      log.debug("Updating status for alert: {} to {}", alertId, statusId);
+//      return alertRepository.updateStatus(alertId, statusId);
+//   }
+//
+//   public Alert updateStatusWithAudit(String alertId, String statusId, AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertOnId(alertId);
+//      Alert updatedAlert = updateStatus(alertId, statusId);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(oldAlert.getStatus());
 //      auditLogRequest.setNewValue(statusId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
-//
-//   public Alert changeStep(String alertId, Long stepId, AuditLogRequest auditLogRequest) {
+//   // Step Management Operations
+//   public Alert changeStep(String alertId, Long stepId) {
+//      log.debug("Changing step for alert: {} to step: {}", alertId, stepId);
 //      Step step = stepsRepository.findByStepId(stepId);
 //      if (step == null) {
 //         throw new CaisNotFoundException("Step not found with id: " + stepId);
@@ -859,85 +1104,212 @@ public class AlertService {
 //         throw new CaisNotFoundException("Step status not found for step id: " + stepId);
 //      }
 //
-//      Alert oldAlert = getAlertOnId(alertId);
 //      AlertEntity updatedEntity = alertRepository.changeStep(alertId, stepId, step.getStepName(), stepStatus.getStepName());
 //      if (updatedEntity == null) {
 //         throw new CaisNotFoundException("Alert not found with id: " + alertId);
 //      }
-//      Alert updatedAlert = alertMapper.toModel(updatedEntity);
+//      return alertMapper.toModel(updatedEntity);
+//   }
+//
+//   public Alert changeStepWithAudit(String alertId, Long stepId, AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertOnId(alertId);
+//      Alert updatedAlert = changeStep(alertId, stepId);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(oldAlert.getAlertStepName());
 //      auditLogRequest.setNewValue(updatedAlert.getAlertStepName());
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
 //
-//   public Map<String, Object> getAllAlerts(String name, String state, List<String> accountNumbers, List<String> owners,
-//                                           List<String> assignees, Date createdDateFrom, Date createdDateTo, @Valid int limit, @Valid int offset,
-//                                           AuditLogRequest auditLogRequest) {
-//      validateRequestParams(name, state, accountNumbers, owners, assignees, createdDateFrom, createdDateTo, offset, limit);
+//   // Alert Search Operations
+//   public List<AlertEntity> findAlertsByCriteria(
+//           String alertId, String createDate, String lastUpdateDate, String totalScore,
+//           String createdBy, String businessDate, String focalEntity, String focus, String alertTypeId,
+//           String alertRegion, String alertGroupId, Boolean isConsolidated, Boolean isActive,
+//           Boolean hasMultipleScenario, Boolean isDeleted, String orgUnitId, String orgFamily,
+//           String previousOrgUnitId, Boolean isOrgUnitUpdated, Boolean isRelatedAlert, String ownerId,
+//           String ownerName, String status, String alertStepId, String alertStepName, Boolean isCaseCreated) {
+//
+//      log.debug("Finding alerts by criteria");
+//      return alertRepository.findAlertsByCriteria(
+//              alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate,
+//              focalEntity, focus, alertTypeId, alertRegion, alertGroupId, isConsolidated,
+//              isActive, hasMultipleScenario, isDeleted, orgUnitId, orgFamily, previousOrgUnitId,
+//              isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId,
+//              alertStepName, isCaseCreated);
+//   }
+//
+//   public List<AlertEntity> findAlertsByCriteriaWithAudit(
+//           String alertId, String createDate, String lastUpdateDate, String totalScore,
+//           String createdBy, String businessDate, String focalEntity, String focus, String alertTypeId,
+//           String alertRegion, String alertGroupId, Boolean isConsolidated, Boolean isActive,
+//           Boolean hasMultipleScenario, Boolean isDeleted, String orgUnitId, String orgFamily,
+//           String previousOrgUnitId, Boolean isOrgUnitUpdated, Boolean isRelatedAlert, String ownerId,
+//           String ownerName, String status, String alertStepId, String alertStepName, Boolean isCaseCreated,
+//           AuditLogRequest auditLogRequest) {
+//
+//      List<AlertEntity> alerts = findAlertsByCriteria(
+//              alertId, createDate, lastUpdateDate, totalScore, createdBy, businessDate,
+//              focalEntity, focus, alertTypeId, alertRegion, alertGroupId, isConsolidated,
+//              isActive, hasMultipleScenario, isDeleted, orgUnitId, orgFamily, previousOrgUnitId,
+//              isOrgUnitUpdated, isRelatedAlert, ownerId, ownerName, status, alertStepId,
+//              alertStepName, isCaseCreated);
+//
+//      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setDescription("Searched alerts by criteria");
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              null,
+//              null,
+//              "Found " + alerts.size() + " alerts");
+//
+//      return alerts;
+//   }
+//
+//   // Alert Management Operations
+//   public Map<String, Object> getAllAlerts(String name, String state, List<String> accountNumbers,
+//                                           List<String> owners, List<String> assignees, Date createdDateFrom,
+//                                           Date createdDateTo, @Valid int limit, @Valid int offset) {
+//      log.debug("Getting all alerts with filters");
+//      validateRequestParams(name, state, accountNumbers, owners, assignees, createdDateFrom,
+//              createdDateTo, offset, limit);
 //
 //      try {
-//         List<AlertEntity> allAlertEntities = alertRepository.getAllAlerts(name, state, accountNumbers, owners,
-//                 assignees, createdDateFrom, createdDateTo, offset, limit);
+//         List<AlertEntity> allAlertEntities = alertRepository.getAllAlerts(name, state, accountNumbers,
+//                 owners, assignees, createdDateFrom, createdDateTo, offset, limit);
 //
-//         List<Alert> allAlerts = allAlertEntities.stream().map(a -> alertMapper.toModel(a))
+//         List<Alert> allAlerts = allAlertEntities.stream()
+//                 .map(alertMapper::toModel)
 //                 .collect(Collectors.toList());
 //
 //         Map<String, Object> response = new HashMap<>();
 //         response.put("alerts", allAlerts);
 //         response.put("count", allAlerts.size());
-//
-//         auditLogRequest.setAffectedItemType("Alert");
-//         auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//                 auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//                 auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
-//
 //         return response;
 //      } catch (Exception e) {
+//         log.error("Error retrieving alerts", e);
 //         throw new CaisBaseException("Error retrieving alerts");
 //      }
 //   }
 //
-//   public Alert patchAlert(String alertId, String alertType, Alert alert, AuditLogRequest auditLogRequest) {
+//   public Map<String, Object> getAllAlertsWithAudit(String name, String state, List<String> accountNumbers,
+//                                                    List<String> owners, List<String> assignees, Date createdDateFrom,
+//                                                    Date createdDateTo, @Valid int limit, @Valid int offset,
+//                                                    AuditLogRequest auditLogRequest) {
+//      Map<String, Object> response = getAllAlerts(name, state, accountNumbers, owners, assignees,
+//              createdDateFrom, createdDateTo, limit, offset);
+//
+//      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setDescription("Retrieved filtered alerts");
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              null,
+//              null,
+//              "Retrieved " + response.get("count") + " alerts");
+//
+//      return response;
+//   }
+//
+//   public Alert patchAlert(String alertId, String alertType, Alert alert) {
+//      log.debug("Patching alert: {} of type: {}", alertId, alertType);
 //      AlertEntity upsertedAlert = alertRepository.patchAlert(alertMapper.toEntity(alertId, alert), alertType);
-//      Alert updatedAlert = alertMapper.toModel(upsertedAlert);
+//      return alertMapper.toModel(upsertedAlert);
+//   }
+//
+//   public Alert patchAlertWithAudit(String alertId, String alertType, Alert alert,
+//                                    AuditLogRequest auditLogRequest) {
+//      Alert oldAlert = getAlertById(alertId, alertType);
+//      Alert updatedAlert = patchAlert(alertId, alertType, alert);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditLogRequest.setOldValue(oldAlert.toString());
+//      auditLogRequest.setNewValue(updatedAlert.toString());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
 //
 //      return updatedAlert;
 //   }
 //
-//   public void deleteAlertById(String alertId, String alertType, AuditLogRequest auditLogRequest) {
-//      Alert alertToDelete = getAlertById(alertId, alertType, auditLogRequest);
+//   public void deleteAlertById(String alertId, String alertType) {
+//      log.debug("Deleting alert: {} of type: {}", alertId, alertType);
 //      AlertEntity alertById = alertRepository.deleteAlertById(alertId, alertType);
 //      if (alertById == null) {
-//         throw new CaisNotFoundException();
+//         throw new CaisNotFoundException("Alert not found with id: " + alertId);
 //      }
+//   }
+//
+//   public void deleteAlertByIdWithAudit(String alertId, String alertType, AuditLogRequest auditLogRequest) {
+//      Alert alertToDelete = getAlertById(alertId, alertType);
+//      deleteAlertById(alertId, alertType);
 //
 //      auditLogRequest.setAffectedItemType("Alert");
 //      auditLogRequest.setAffectedItemId(alertId);
 //      auditLogRequest.setOldValue(alertToDelete.toString());
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              auditLogRequest.getOldValue(),
+//              auditLogRequest.getNewValue());
+//   }
+//   // Bulk Operations
+//   public List<Alert> createAlerts(List<Alert> alerts) {
+//      log.debug("Creating {} bulk alerts", alerts.size());
+//      return alerts.stream()
+//              .map(this::createAlert)
+//              .collect(Collectors.toList());
 //   }
 //
-//   public List<Alert> createAlerts(List<Alert> alerts, AuditLogRequest auditLogRequest) {
-//      List<Alert> createdAlerts = alerts.stream().map(a -> createAlert(a, auditLogRequest)).collect(Collectors.toList());
+//   public List<Alert> createAlertsWithAudit(List<Alert> alerts, AuditLogRequest auditLogRequest) {
+//      List<Alert> createdAlerts = createAlerts(alerts);
+//
+//      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setDescription("Created bulk alerts");
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              null,
+//              null,
+//              "Created " + createdAlerts.size() + " alerts");
+//
 //      return createdAlerts;
 //   }
 //
-//   public Alert createAlert(Alert alert, AuditLogRequest auditLogRequest) {
+//   public Alert createAlert(Alert alert) {
+//      log.debug("Creating new alert");
 //      List<String> validationErrors = validateAlert(alert);
 //      if (!validationErrors.isEmpty()) {
 //         throw new AlertValidationException("Alert validation failed", validationErrors);
@@ -945,18 +1317,57 @@ public class AlertService {
 //
 //      AlertEntity alertEntity = alertMapper.toEntity(alert);
 //      AlertEntity upsertedAlert = alertRepository.createUpsertAlert(alertEntity);
-//      Alert createdAlert = alertMapper.toModel(upsertedAlert);
+//      return alertMapper.toModel(upsertedAlert);
+//   }
 //
-//      auditLogRequest.setAffectedItemId(createdAlert.getAlertId());
+//   public Alert createAlertWithAudit(Alert alert, AuditLogRequest auditLogRequest) {
+//      Alert createdAlert = createAlert(alert);
+//
 //      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setAffectedItemId(createdAlert.getAlertId());
 //      auditLogRequest.setNewValue(createdAlert.toString());
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              null,
+//              auditLogRequest.getNewValue());
 //
 //      return createdAlert;
 //   }
 //
+//   public Alert getAlertById(final String alertId, String alertType) {
+//      log.debug("Getting alert by ID: {} and type: {}", alertId, alertType);
+//      AlertEntity alertById = alertRepository.getAlertById(alertId, alertType);
+//      if (alertById == null) {
+//         throw new CaisNotFoundException("Alert not found with id: " + alertId);
+//      }
+//      return alertMapper.toModel(alertById);
+//   }
+//
+//   public Alert getAlertByIdWithAudit(final String alertId, String alertType,
+//                                      AuditLogRequest auditLogRequest) {
+//      Alert alert = getAlertById(alertId, alertType);
+//
+//      auditLogRequest.setAffectedItemType("Alert");
+//      auditLogRequest.setAffectedItemId(alertId);
+//      auditTrailService.logAction(auditLogRequest.getUserId(),
+//              auditLogRequest.getUserRole(),
+//              auditLogRequest.getActionId(),
+//              auditLogRequest.getDescription(),
+//              auditLogRequest.getCategory(),
+//              auditLogRequest.getAffectedItemType(),
+//              auditLogRequest.getAffectedItemId(),
+//              null,
+//              alert.toString());
+//
+//      return alert;
+//   }
+//
+//   // Validation Methods
 //   private List<String> validateAlert(Alert alert) {
 //      List<String> errors = new ArrayList<>();
 //
@@ -991,71 +1402,13 @@ public class AlertService {
 //      return errors;
 //   }
 //
-//   public AlertEntity insertAlert(String alertType, AlertEntity alertEntity, AuditLogRequest auditLogRequest) {
-//      validateAlert(alertType, alertEntity);
-//      alertEntity.setAlertTypeId(alertType);
-//      AlertEntity createdAlert = alertRepository.insertAlert(alertEntity);
-//
-//      auditLogRequest.setAffectedItemType("Alert");
-//      auditLogRequest.setAffectedItemId(createdAlert.getAlertId());
-//      auditLogRequest.setNewValue(createdAlert.toString());
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
-//
-//      return createdAlert;
-//   }
-//
-//   private void validateAlert(String alertType, AlertEntity alertEntity) {
-//      if (StringUtils.isEmpty(alertType)) {
-//         throw new CaisBaseException("AlertType is mandatory");
-//      }
-//
-//      if (alertEntity == null) {
-//         throw new CaisBaseException("AlertEntity cannot be null");
-//      }
-//
-//      if (!alertType.equals(alertEntity.getAlertTypeId())) {
-//         throw new IllegalArgumentException(String.format("Alert type mismatch: expected %s but got %s", alertType, alertEntity.getAlertTypeId()));
-//      }
-//
-//      if (StringUtils.isEmpty(alertEntity.getAlertId())) {
-//         throw new CaisBaseException("AlertId is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getCreateDate())) {
-//         throw new CaisBaseException("CreateDate is mandatory");
-//      }
-//      if (alertEntity.getTotalScore() == null) {
-//         throw new CaisBaseException("TotalScore is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getCreatedBy())) {
-//         throw new CaisBaseException("CreatedBy is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getBusinessDate())) {
-//         throw new CaisBaseException("BusinessDate is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getFocalEntity())) {
-//         throw new CaisBaseException("FocalEntity is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getFocus())) {
-//         throw new CaisBaseException("Focus is mandatory");
-//      }
-//      if (StringUtils.isEmpty(alertEntity.getDetails())) {
-//         throw new CaisBaseException("Details is mandatory");
-//      }
-//      if (alertEntity.getReasonDetails() == null) {
-//         throw new CaisBaseException("ReasonDetails and Reasons are mandatory");
-//      }
-//   }
-//
 //   private void validateRequestParams(String name, String state, List<String> accountNumbers,
-//                                      List<String> owners, List<String> assignees, Date createdDateFrom, Date createdDateTo, int offset, int limit) {
+//                                      List<String> owners, List<String> assignees, Date createdDateFrom,
+//                                      Date createdDateTo, int offset, int limit) {
 //      StringBuilder errorMessage = new StringBuilder();
 //
-//      if (name != null && !name.isEmpty()) {
-//         if (name.length() > 20) {
-//            errorMessage.append("name cannot be longer than 20 characters;");
-//         }
+//      if (name != null && !name.isEmpty() && name.length() > 20) {
+//         errorMessage.append("name cannot be longer than 20 characters;");
 //      }
 //
 //      if (accountNumbers != null && accountNumbers.size() > 5) {
@@ -1070,10 +1423,8 @@ public class AlertService {
 //         errorMessage.append("assignee list cannot be greater than 5;");
 //      }
 //
-//      if (createdDateFrom != null && createdDateTo != null) {
-//         if (createdDateFrom.after(createdDateTo)) {
-//            errorMessage.append("from date cannot be after to date;");
-//         }
+//      if (createdDateFrom != null && createdDateTo != null && createdDateFrom.after(createdDateTo)) {
+//         errorMessage.append("from date cannot be after to date;");
 //      }
 //
 //      if (limit < 0) {
@@ -1082,27 +1433,10 @@ public class AlertService {
 //      if (offset < 0) {
 //         errorMessage.append("offset cannot be negative;");
 //      }
-//      if (errorMessage.isEmpty()) {
-//         return;
+//
+//      if (errorMessage.length() > 0) {
+//         throw new CaisIllegalArgumentException(errorMessage.toString());
 //      }
-//
-//      throw new CaisIllegalArgumentException(errorMessage.toString());
-//   }
-//
-//   public Alert getAlertById(final String alertId, String alertType, AuditLogRequest auditLogRequest) {
-//      AlertEntity alertById = alertRepository.getAlertById(alertId, alertType);
-//      if (alertById == null) {
-//         throw new CaisNotFoundException();
-//      }
-//      Alert alert = alertMapper.toModel(alertById);
-//
-//      auditLogRequest.setAffectedItemType("Alert");
-//      auditLogRequest.setAffectedItemId(alertId);
-//      auditTrailService.logAction(auditLogRequest.getUserId(), auditLogRequest.getUserRole(), auditLogRequest.getActionId(),
-//              auditLogRequest.getDescription(), auditLogRequest.getCategory(), auditLogRequest.getAffectedItemType(),
-//              auditLogRequest.getAffectedItemId(), auditLogRequest.getOldValue(), auditLogRequest.getNewValue());
-//
-//      return alert;
 //   }
 //}
 //

@@ -1,5 +1,6 @@
 package com.dair.cais.exception;
 
+import com.dair.cais.reports.exception.InvalidQueryException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,6 +76,28 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(body);
+    }
+
+    @ExceptionHandler(InvalidQueryException.class)
+    public ResponseEntity<Object> handleInvalidQueryException(
+            InvalidQueryException ex,
+            WebRequest request) {
+
+        log.error("Invalid query error: {}", ex.getMessage());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", ZonedDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Invalid Query");
+        body.put("message", ex.getMessage());
+        if (ex.getDetails() != null) {
+            body.put("details", ex.getDetails());
+        }
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
                 .body(body);
     }
 }

@@ -2,10 +2,13 @@ package com.dair.cais.alert;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 import org.springframework.data.mongodb.core.mapping.MongoId;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Map;
 @NoArgsConstructor
 @Data
@@ -44,6 +47,22 @@ public class AlertEntity implements Serializable {
     private Map<String, Object> reasonDetails;
     private Map<String, Object> customFields;
     private Map<String, Object> workflowInfo;
+    private String pivot;
+    private String accountId;
+    private String transactionId;
+    private String customerId;
+    private String houseHoldId;
+    private String priority;
+    private String tag;
+    private String branchId;
+    private String representativeId;
+    private String buildingBlock;
+    private String watchListId;
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
 }
 
 

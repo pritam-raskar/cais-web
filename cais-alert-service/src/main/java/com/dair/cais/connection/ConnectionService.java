@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,16 +16,18 @@ import javax.sql.DataSource;
 import java.sql.DriverManager;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ConnectionService {
+public class ConnectionService  implements DisposableBean {
     private final ConnectionRepository repository;
     private final ConnectionMapper mapper;
     private final EncryptionService encryptionService;
     private final ConnectionValidationService validationService;
+    private final Map<Long, HikariDataSource> connectionPools = new ConcurrentHashMap<>();
 
     @Transactional(readOnly = true)
     public List<Connection> getAllConnections() {
@@ -430,4 +433,127 @@ public class ConnectionService {
             throw new ConnectionValidationException("Connection not found with ID: " + connectionId);
         }
     }
+
+
+    // changes for Report execution
+    // Add this new method for report execution
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> executeQuery(Long connectionId, String sql, Object... params) {
+        log.debug("Executing query on connection {}: {}", connectionId, sql);
+        long startTime = System.currentTimeMillis();
+
+        ConnectionEntity entity = repository.findById(connectionId)
+                .orElseThrow(() -> new ConnectionValidationException("Connection not found: " + connectionId));
+
+        try {
+            HikariDataSource dataSource = getOrCreateConnectionPool(connectionId, entity);
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+            List<Map<String, Object>> results = params != null && params.length > 0
+                    ? jdbcTemplate.queryForList(sql, params)
+                    : jdbcTemplate.queryForList(sql);
+
+            long executionTime = System.currentTimeMillis() - startTime;
+            log.debug("Query executed successfully in {}ms, returned {} rows",
+                    executionTime, results.size());
+
+            return results;
+
+        } catch (Exception e) {
+            log.error("Error executing query on connection {}: {}", connectionId, e.getMessage(), e);
+            throw new ConnectionValidationException(
+                    "Failed to execute query on connection " + connectionId,
+                    e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    private HikariDataSource getOrCreateConnectionPool(Long connectionId, ConnectionEntity entity) {
+        return connectionPools.computeIfAbsent(connectionId, id -> {
+            try {
+                ConnectionDetails details = encryptionService.decryptObject(
+                        entity.getEncryptedData(),
+                        entity.getIv(),
+                        ConnectionDetails.class
+                );
+                return createPooledDataSource(entity.getConnectionType(), details);
+            } catch (Exception e) {
+                log.error("Error creating connection pool for connection {}: {}",
+                        connectionId, e.getMessage(), e);
+                throw new ConnectionValidationException(
+                        "Failed to create connection pool",
+                        e.getMessage(),
+                        e
+                );
+            }
+        });
+    }
+
+    private HikariDataSource createPooledDataSource(ConnectionType connectionType, ConnectionDetails details) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(buildJdbcUrl(connectionType, details));
+        config.setUsername(details.getUsername());
+        config.setPassword(details.getPassword());
+        config.setDriverClassName(connectionType.getDriverClass());
+
+        // Enhanced pool settings for report execution
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(2);
+        config.setIdleTimeout(300000); // 5 minutes
+        config.setConnectionTimeout(20000); // 20 seconds
+        config.setValidationTimeout(5000); // 5 seconds
+        config.setLeakDetectionThreshold(60000); // 1 minute
+
+        // Set pool name for better monitoring
+        config.setPoolName("ReportPool-" + connectionType.name());
+
+        // Add connection test query
+        config.setConnectionTestQuery("SELECT 1");
+
+        return new HikariDataSource(config);
+    }
+
+    // Add cleanup method
+    public void closeConnectionPool(Long connectionId) {
+        HikariDataSource dataSource = connectionPools.remove(connectionId);
+        if (dataSource != null && !dataSource.isClosed()) {
+            log.info("Closing connection pool for connection {}", connectionId);
+            dataSource.close();
+        }
+    }
+
+    // Add cleanup method for all pools
+    public synchronized void closeAllConnectionPools() {
+        log.info("Closing all connection pools");
+        connectionPools.forEach((connectionId, dataSource) -> {
+            if (dataSource != null && !dataSource.isClosed()) {
+                try {
+                    dataSource.close();
+                    log.debug("Closed connection pool for connection {}", connectionId);
+                } catch (Exception e) {
+                    log.warn("Error closing connection pool {}: {}", connectionId, e.getMessage());
+                }
+            }
+        });
+        connectionPools.clear();
+    }
+
+//    // Override finalize to ensure pools are closed
+//    @Override
+//    protected void finalize() throws Throwable {
+//        try {
+//            closeAllConnectionPools();
+//        } finally {
+//            super.finalize();
+//        }
+//    }
+
+    // Remove the finalize() method and replace with destroy() from DisposableBean
+    @Override
+    public void destroy() {
+        log.info("Destroying ConnectionService, cleaning up connection pools");
+        closeAllConnectionPools();
+    }
+
 }

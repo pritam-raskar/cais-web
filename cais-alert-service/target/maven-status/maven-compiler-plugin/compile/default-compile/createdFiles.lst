@@ -197,6 +197,7 @@ com/dair/cais/type/AlertTypeController$3.class
 com/dair/cais/logging/LogResponse$LogResponseBuilder.class
 com/dair/cais/fileattachement/FileAttachmentService.class
 com/dair/cais/alert/reason/AlertTransitionReasonController.class
+com/dair/cais/access/RolePolicyMapping/RolesPolicyMappingController$RolePolicyRequest.class
 com/dair/cais/reports/dto/FormattingConfigDto$DataFormatDto$DataFormatDtoBuilder.class
 com/dair/cais/access/user/StringPrefixedSequenceIdGenerator.class
 com/dair/cais/access/alertType/alertTypeMapper1.class

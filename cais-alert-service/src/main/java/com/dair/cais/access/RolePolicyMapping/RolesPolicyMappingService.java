@@ -10,8 +10,7 @@ import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -189,6 +188,102 @@ public class RolesPolicyMappingService {
                     }
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<RolesPolicyMapping> updateRolePolicyMappings(
+            Integer roleId,
+            List<RolesPolicyMappingController.RolePolicyRequest> requests) {
+
+        log.debug("Starting update of policy mappings for role ID: {}", roleId);
+
+        // Verify role exists
+        RoleEntity role = roleRepository.findById(roleId)
+                .orElseThrow(() -> {
+                    log.error("Role not found with ID: {}", roleId);
+                    return new ResourceNotFoundException("Role not found with ID: " + roleId);
+                });
+
+        // Get all requested policy IDs
+        Set<Integer> requestedPolicyIds = requests.stream()
+                .map(RolesPolicyMappingController.RolePolicyRequest::policyId)
+                .collect(Collectors.toSet());
+
+        // Validate and get all policies
+        Map<Integer, PolicyEntity> policyMap = validateAndGetPolicies(requestedPolicyIds);
+
+        try {
+            // Get existing mappings
+            List<RolesPolicyMappingEntity> existingMappings =
+                    repository.findByRoleRoleIdWithPolicyAndRole(roleId);
+
+            // Create set of existing policy IDs
+            Set<Integer> existingPolicyIds = existingMappings.stream()
+                    .map(mapping -> mapping.getPolicy().getPolicyId())
+                    .collect(Collectors.toSet());
+
+            // Find mappings to delete (existing but not in request)
+            Set<Integer> policyIdsToDelete = new HashSet<>(existingPolicyIds);
+            policyIdsToDelete.removeAll(requestedPolicyIds);
+
+            if (!policyIdsToDelete.isEmpty()) {
+                log.debug("Deleting {} mappings for role ID: {}", policyIdsToDelete.size(), roleId);
+                existingMappings.stream()
+                        .filter(mapping -> policyIdsToDelete.contains(mapping.getPolicy().getPolicyId()))
+                        .forEach(repository::delete);
+            }
+
+            // Find mappings to add (in request but not existing)
+            Set<Integer> policyIdsToAdd = new HashSet<>(requestedPolicyIds);
+            policyIdsToAdd.removeAll(existingPolicyIds);
+
+            List<RolesPolicyMappingEntity> newMappings = policyIdsToAdd.stream()
+                    .map(policyId -> {
+                        RolesPolicyMappingEntity entity = new RolesPolicyMappingEntity();
+                        entity.setRole(role);
+                        entity.setPolicy(policyMap.get(policyId));
+                        return entity;
+                    })
+                    .collect(Collectors.toList());
+
+            if (!newMappings.isEmpty()) {
+                log.debug("Adding {} new mappings for role ID: {}", newMappings.size(), roleId);
+                repository.saveAll(newMappings);
+            }
+
+            // Fetch and return all current mappings
+            List<RolesPolicyMappingEntity> finalMappings =
+                    repository.findByRoleRoleIdWithPolicyAndRole(roleId);
+
+            log.info("Successfully updated policy mappings for role ID: {}. Added: {}, Deleted: {}",
+                    roleId, policyIdsToAdd.size(), policyIdsToDelete.size());
+
+            return finalMappings.stream()
+                    .map(mapper::toModel)
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Error updating policy mappings for role ID: {}", roleId, e);
+            throw new RuntimeException("Failed to update policy mappings: " + e.getMessage(), e);
+        }
+    }
+
+    private Map<Integer, PolicyEntity> validateAndGetPolicies(Set<Integer> policyIds) {
+        List<PolicyEntity> policies = policyRepository.findAllById(policyIds);
+        Map<Integer, PolicyEntity> policyMap = policies.stream()
+                .collect(Collectors.toMap(PolicyEntity::getPolicyId, policy -> policy));
+
+        // Check if any policies were not found
+        Set<Integer> foundPolicyIds = policyMap.keySet();
+        Set<Integer> missingPolicyIds = new HashSet<>(policyIds);
+        missingPolicyIds.removeAll(foundPolicyIds);
+
+        if (!missingPolicyIds.isEmpty()) {
+            log.error("Policies not found with IDs: {}", missingPolicyIds);
+            throw new ResourceNotFoundException("Policies not found with IDs: " + missingPolicyIds);
+        }
+
+        return policyMap;
     }
 }
 

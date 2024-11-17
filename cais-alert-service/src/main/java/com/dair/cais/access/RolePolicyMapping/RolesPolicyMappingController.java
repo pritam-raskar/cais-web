@@ -2,7 +2,11 @@ package com.dair.cais.access.RolePolicyMapping;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,4 +101,46 @@ public class RolesPolicyMappingController {
         service.deleteMapping(rpmId);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/role/{roleId}")
+    @Operation(summary = "Update policy mappings for a role",
+            description = "Updates policy mappings for a role. Adds new mappings if they don't exist and removes mappings that aren't in the request.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Mappings successfully updated"),
+                    @ApiResponse(responseCode = "400", description = "Invalid request"),
+                    @ApiResponse(responseCode = "404", description = "Role or Policy not found"),
+                    @ApiResponse(responseCode = "500", description = "Internal server error")
+            })
+    public ResponseEntity<List<RolesPolicyMapping>> updateRolePolicyMappings(
+            @Parameter(description = "ID of the role to update", required = true)
+            @PathVariable @NotNull Integer roleId,
+
+            @Parameter(description = "List of policy mappings to update", required = true)
+            @RequestBody @NotEmpty List<@Valid RolePolicyRequest> requests) {
+
+        // Validate that all roleIds in the request match the path parameter
+        if (requests.stream().anyMatch(req -> !req.roleId().equals(roleId))) {
+            log.error("Request contains roleId that doesn't match path parameter: {}", roleId);
+            throw new IllegalArgumentException("All roleId values must match the path parameter");
+        }
+
+        log.info("Received request to update policy mappings for role ID: {}, number of policies: {}",
+                roleId, requests.size());
+
+        List<RolesPolicyMapping> updatedMappings = service.updateRolePolicyMappings(roleId, requests);
+
+        log.info("Successfully updated policy mappings for role ID: {}, updated mappings count: {}",
+                roleId, updatedMappings.size());
+
+        return ResponseEntity.ok(updatedMappings);
+    }
+
+    @Schema(description = "Request object for updating role-policy mappings")
+    public record RolePolicyRequest(
+            @Schema(description = "ID of the policy to map to the role", required = true)
+            @NotNull Integer policyId,
+
+            @Schema(description = "ID of the role", required = true)
+            @NotNull Integer roleId
+    ) {}
 }

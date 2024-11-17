@@ -11,7 +11,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/reports")
+@RequestMapping("/reportsOLD")
 @RequiredArgsConstructor
 public class ReportController {
 

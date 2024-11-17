@@ -13,6 +13,7 @@ import java.util.Optional;
 
 public interface ReportsRepository extends JpaRepository<ReportsEntity, Integer>  {
     Optional<ReportsEntity> findByReportIdentifier(String reportIdentifier);
+    Optional<ReportsEntity> findByReportId(Integer reportId);
 
     List<ReportsEntity> findByConnectionId(Long connectionId);
 

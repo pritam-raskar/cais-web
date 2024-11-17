@@ -256,6 +256,79 @@ public class AlertService {
       return updatedAlert;
    }
 
+   @Transactional
+   public Alert unassignUserFromAlert(String alertId) {
+      log.debug("Starting synchronized ownerId update for alertId: {}", alertId);
+
+      try {
+         // Validate if the alert exists in MongoDB
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+
+         // Validate if the alert exists in PostgreSQL
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
+                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+
+
+
+         // Update MongoDB
+         Query query = new Query(Criteria.where("alertId").is(alertId));
+         Update update = new Update();
+         update.set("ownerId", "");
+         update.set("ownerName", "");
+         update.set("lastUpdateDate", LocalDateTime.now().toString());
+
+         AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
+                 query,
+                 update,
+                 FindAndModifyOptions.options().returnNew(true),
+                 AlertEntity.class,
+                 CaisAlertConstants.ALERTS
+         );
+
+         if (updatedMongoAlert == null) {
+            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+         }
+
+         // Update PostgreSQL
+         rdbmsAlert.setOwnerId("");
+         rdbmsAlert.setOwnerName("");
+         rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
+
+         log.info("Successfully unassigned owner in both databases for alertId: {}", alertId);
+         return alertMapper.toModel(updatedMongoAlert);
+      } catch (Exception e) {
+         log.error("Failed to unassign owner for alertId: {}. Rolling back both databases.", alertId, e);
+         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+         throw new RuntimeException("Failed to unassign owner in databases", e);
+      }
+   }
+
+   @Transactional
+   public Alert unassignUserFromAlertWithAudit(String alertId,  AuditLogRequest auditLogRequest) {
+      Alert oldAlert = getAlertOnId(alertId);
+      Alert updatedAlert = unassignUserFromAlert(alertId);
+
+      auditLogRequest.setAffectedItemType("Alert");
+      auditLogRequest.setAffectedItemId(alertId);
+      auditLogRequest.setOldValue(oldAlert.getOwnerId());
+      auditLogRequest.setNewValue("");
+      auditTrailService.logAction(auditLogRequest.getUserId(),
+              auditLogRequest.getUserRole(),
+              auditLogRequest.getActionId(),
+              auditLogRequest.getDescription(),
+              auditLogRequest.getCategory(),
+              auditLogRequest.getAffectedItemType(),
+              auditLogRequest.getAffectedItemId(),
+              auditLogRequest.getOldValue(),
+              auditLogRequest.getNewValue());
+
+      return updatedAlert;
+   }
+
 
    @Transactional
    public Alert updateOwnerId(String alertId, String ownerId) {
@@ -491,6 +564,7 @@ public class AlertService {
          rdbmsAlert.setAlertStepId(String.valueOf(stepId));
          rdbmsAlert.setAlertStepName(StepName);
          rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+//         rdbmsAlert.setDueDate(LocalDateTime.now()+10);
 
 
          RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);

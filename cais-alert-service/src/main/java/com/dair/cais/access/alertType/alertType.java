@@ -13,4 +13,5 @@ public class alertType {
     private String typeName;
     private String typeSlug;
     private LocalDateTime updatedAt;
+    private Boolean isActive;
 }

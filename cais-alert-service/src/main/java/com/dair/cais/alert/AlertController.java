@@ -39,6 +39,17 @@ public class AlertController {
         return ResponseEntity.ok(alertService.getAllActiveAlertsWithAudit(auditLogRequest));
     }
 
+        @GetMapping("/alertbyloggedinUser/{userId}")  // Changed to POST since we're using request body
+    @Operation(summary = "Get alerts from orgFamily for logged in user")
+    public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyBYUserOrgUnits(
+            @PathVariable String userId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+
+        log.debug("Received request to find alerts for user: {} with audit request: {}", userId, auditLogRequest);
+        List<AlertEntity> alerts = alertService.findAlertsByOrgFamilyByUserOrgKeysWithAudit(userId, auditLogRequest);
+        return ResponseEntity.ok().body(alerts);
+    }
+
 
 
     @GetMapping("/alertId/{alertId}")
@@ -200,24 +211,7 @@ public class AlertController {
         return ResponseEntity.ok(alertService.updateOrgUnitIdWithAudit(alertId, orgUnitId, auditLogRequest));
     }
 
-    @PatchMapping("/changestatus/{alertId}")
-    @Operation(summary = "Update alert status")
-    public ResponseEntity<Alert> updateStatus(
-            @PathVariable String alertId,
-            @RequestParam String statusId) {
-        log.debug("Request received to update status for alert: {}", alertId);
-        return ResponseEntity.ok(alertService.updateStatus(alertId, statusId));
-    }
 
-    @PatchMapping("/audit/changestatus/{alertId}")
-    @Operation(summary = "Update alert status with audit")
-    public ResponseEntity<Alert> updateStatusWithAudit(
-            @PathVariable String alertId,
-            @RequestParam String statusId,
-            @RequestBody AuditLogRequest auditLogRequest) {
-        log.debug("Request received to update status for alert: {} with audit", alertId);
-        return ResponseEntity.ok(alertService.updateStatusWithAudit(alertId, statusId, auditLogRequest));
-    }
 
     @PatchMapping("/changestep/{alertId}")
     @Operation(summary = "Change alert step")

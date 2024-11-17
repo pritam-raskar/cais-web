@@ -36,9 +36,9 @@ public class alertTypeController1 {
 
     // Delete an alert type by ID
     @DeleteMapping("/delete/{alertTypeId}")
-    public ResponseEntity<Void> deleteAlertType(@PathVariable String alertTypeId) {
-        alertTypeService.deleteAlertType(alertTypeId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<alertType> deleteAlertType(@PathVariable String alertTypeId) {
+        alertType alertType  = alertTypeService.deleteAlertType(alertTypeId);
+        return ResponseEntity.ok(alertType);
     }
 
     // Update an alert type by ID

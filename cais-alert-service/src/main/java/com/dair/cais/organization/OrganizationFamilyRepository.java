@@ -10,5 +10,6 @@ import java.util.Set;
 @Repository
 public interface OrganizationFamilyRepository extends JpaRepository<OrganizationFamilyEntity, Integer> {
     Optional<OrganizationFamilyEntity> findByOrgKey(String orgKey);
+
     List<OrganizationFamilyEntity> findAllByOrgKeyIn(Set<String> orgKeys);
 }

@@ -1,11 +1,13 @@
 package com.dair.cais.alert;
 
 
-import com.dair.model.CaisBaseModel;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.mongodb.core.mapping.FieldType;
+import org.springframework.data.mongodb.core.mapping.MongoId;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -14,12 +16,14 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-
-public class Alert extends CaisBaseModel {
+public class Alert {
+    @Id
+    @MongoId(FieldType.OBJECT_ID)
     private String id;
+
     private String alertId;
-    private String createDate;   //This has to be changed to Date
-    private String lastUpdateDate; //This has to be changed to Date
+    private String createDate;
+    private String lastUpdateDate;
     private Number totalScore;
     private String createdBy;
     private String businessDate; //This has to be changed to Date

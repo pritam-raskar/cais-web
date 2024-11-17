@@ -24,6 +24,7 @@ public class CacheConfig {
     public CacheManager cacheManager(Caffeine caffeine) {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(caffeine);
+//        cacheManager.setCacheNames(java.util.Arrays.asList("userPermissions"));
         cacheManager.setCacheNames(java.util.Arrays.asList("userPermissions", "userOrgUnits", "userOrgKeys"));
         return cacheManager;
     }

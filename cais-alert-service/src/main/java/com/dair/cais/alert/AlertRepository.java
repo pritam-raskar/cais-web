@@ -17,7 +17,6 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,9 +85,6 @@ public class AlertRepository {
 
         return results.getMappedResults();
     }
-
-
-
 
 
     public List<AlertEntity> findAlertsByOrg(String substring) {
@@ -178,100 +174,11 @@ public class AlertRepository {
     }
 
 
-    public Alert updateTotalScore(String alertId, int totalScore) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("alertId").is(alertId));
-        Update update = new Update();
-        update.set("totalScore", totalScore);
-
-        Alert updatedAlert = mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                Alert.class
-        );
-
-        if (updatedAlert == null) {
-            throw new CaisBaseException(String.format("Alert not found with id: %s", alertId));
-        }
-
-        return updatedAlert;
-    }
-
-    public Alert updateOwnerId(String alertId, String ownerId) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("alertId").is(alertId));
-        Update update = new Update();
-        update.set("ownerId", ownerId);
-
-        Alert updatedAlert = mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                Alert.class
-        );
-
-        if (updatedAlert == null) {
-            throw new CaisBaseException(String.format("Alert not found with id: %s", alertId));
-        }
-
-        return updatedAlert;
-    }
-
-    public Alert updateOrgUnitId(String alertId, String orgUnitId) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("alertId").is(alertId));
-        Update update = new Update();
-        update.set("previousOrgUnitId", mongoTemplate.findOne(query, Alert.class).getOrgUnitId());
-        update.set("orgUnitId", orgUnitId);
-
-        Alert updatedAlert = mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                Alert.class
-        );
-
-        if (updatedAlert == null) {
-            throw new CaisBaseException(String.format("Alert not found with id: %s", alertId));
-        }
-
-        return updatedAlert;
-    }
-
-
-    public Alert updateStatus(String alertId, String statusId) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("alertId").is(alertId));
-        Update update = new Update();
-        update.set("status", statusId);
-
-        Alert updatedAlert = mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                Alert.class
-        );
-
-        if (updatedAlert == null) {
-            throw new CaisBaseException(String.format("Alert not found with id: %s", alertId));
-        }
-
-        return updatedAlert;
-    }
-
-    public AlertEntity changeStep(String alertId, Long stepId, String stepName, String statusName) {
+    public AlertEntity findByAlertId(String alertId) {
         Query query = new Query(Criteria.where("alertId").is(alertId));
-        Update update = new Update()
-                .set("alertStepId", stepId)
-                .set("alertStepName", stepName)
-                .set("status", statusName)
-                .set("lastUpdateDate", LocalDateTime.now());
-
-        FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
-
-        return mongoTemplate.findAndModify(query, update, options, AlertEntity.class, CaisAlertConstants.ALERTS);
+        return mongoTemplate.findOne(query, AlertEntity.class, CaisAlertConstants.ALERTS);
     }
+
 
     public AlertEntity createUpsertAlert(AlertEntity alertEntity) {
         String collectionName = extractCollectionName(alertEntity);
@@ -363,8 +270,8 @@ public class AlertRepository {
     }
 
     public List<AlertEntity> getAllAlerts(String name, String state, List<String> accountNumbers,
-                                          List<String> owners, List<String> assignees, Date createdDateFrom, Date createdDateTo, int offset,
-                                          int limit) {
+            List<String> owners, List<String> assignees, Date createdDateFrom, Date createdDateTo, int offset,
+            int limit) {
         final Query query = new Query();
         final List<Criteria> criteria = new ArrayList<>();
 

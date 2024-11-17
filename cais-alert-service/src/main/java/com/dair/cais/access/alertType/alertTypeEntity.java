@@ -33,6 +33,11 @@ public class alertTypeEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_active", nullable = true)
+    private Boolean isActive;
+
+
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

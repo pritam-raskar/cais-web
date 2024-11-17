@@ -2,15 +2,19 @@ package com.dair.cais.reports.service;
 
 import com.dair.cais.connection.ConnectionService;
 import com.dair.cais.reports.*;
+import com.dair.cais.reports.config.PaginationConfig;
 import com.dair.cais.reports.dto.*;
 import com.dair.cais.reports.exception.*;
 import com.dair.cais.reports.repository.ReportColumnRepository;
 import com.dair.cais.reports.repository.ReportsRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.MDC;
+import jakarta.persistence.Query;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,115 +35,118 @@ public class ReportExecutionService {
     private final ConnectionService connectionService;
     private final QueryBuilderService queryBuilderService;
     private final ObjectMapper objectMapper;
+    private final PaginationConfig paginationConfig;
+    private final EntityManager entityManager;
+;
 
-    @Transactional(readOnly = true)
-    public ReportExecutionResultDto executeReport(Integer reportId, ReportQueryRequestDto request) {
-        long startTime = System.currentTimeMillis();
-        int totalFilteredRows = 0;
-        String executedQuery = null;
-
-        log.info("Starting report execution for reportId: {}", reportId);
-
-        try {
-            // Fetch report configuration
-            ReportsEntity report = reportRepository.findById(reportId)
-                    .orElseThrow(() -> new ReportNotFoundException(reportId));
-
-            // Validate report status
-            if (!Boolean.TRUE.equals(report.getIsPublished())) {
-                throw new InvalidReportStateException("Cannot execute unpublished report: " + reportId);
-            }
-
-            // Get configured columns
-            List<ReportColumnEntity> columns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
-            if (columns.isEmpty()) {
-                throw new InvalidReportStateException("Report has no configured columns: " + reportId);
-            }
-
-            // Validate connection exists
-            connectionService.validateConnectionExists(report.getConnectionId());
-
-            // Build and validate query
-            List<Object> queryParams = new ArrayList<>();
-            String sql = buildExecutionQuery(report, columns, request.getQuery(), queryParams);
-            executedQuery = sql; // Store for metadata
-
-            // Execute query with timing
-            long queryStartTime = System.currentTimeMillis();
-            List<Map<String, Object>> rawData;
-
-            try {
-                rawData = connectionService.executeQuery(
-                        report.getConnectionId(),
-                        sql,
-                        queryParams.toArray()
-                );
-                totalFilteredRows = rawData.size(); // Store for metadata
-            } catch (Exception e) {
-                log.error("Query execution failed for report {}: {}", reportId, e.getMessage());
-                throw new ReportExecutionException("Query execution failed", e);
-            }
-
-            long queryEndTime = System.currentTimeMillis();
-            log.debug("Query executed in {}ms, returned {} rows",
-                    queryEndTime - queryStartTime, rawData.size());
-
-            // Format results
-            List<Map<String, Object>> formattedData = formatResults(rawData, columns);
-
-            // Build cache key if caching is enabled
-            String cacheKey = null;
-            ZonedDateTime cacheExpiry = null;
-            if (report.getCacheDuration() != null && report.getCacheDuration() > 0) {
-                cacheKey = buildCacheKey(reportId, request);
-                cacheExpiry = ZonedDateTime.now().plusMinutes(report.getCacheDuration());
-            }
-
-            // Build execution metadata
-            ReportExecutionResultDto.ExecutionMetadata metadata = ReportExecutionResultDto.ExecutionMetadata.builder()
-                    .executionTimeMs(queryEndTime - queryStartTime)
-                    .queryString(executedQuery)
-                    .returnedRows(formattedData.size())
-                    .filteredRows(totalFilteredRows)
-                    .cacheExpiry(cacheExpiry)
-                    .build();
-
-            // Build final result
-            ReportExecutionResultDto result = ReportExecutionResultDto.builder()
-                    .reportId(reportId)
-                    .reportName(report.getReportName())
-                    .columns(columns.stream()
-                            .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
-                            .map(this::mapColumnToDto)
-                            .collect(Collectors.toList()))
-                    .data(formattedData)
-                    .totalRows(formattedData.size())
-                    .executionTime(ZonedDateTime.now())
-                    .metadata(metadata)
-                    .build();
-
-            // Store in cache if enabled
-            if (cacheKey != null) {
-                cacheReport(cacheKey, result, report.getCacheDuration());
-            }
-
-            long totalTime = System.currentTimeMillis() - startTime;
-            log.info("Report {} executed successfully in {}ms, returned {} rows",
-                    reportId, totalTime, formattedData.size());
-
-            return result;
-
-        } catch (ReportNotFoundException | InvalidReportStateException | InvalidQueryException e) {
-            log.error("Report execution failed with validation error: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Unexpected error during report execution for ID {}: {}", reportId, e.getMessage(), e);
-            throw new ReportExecutionException("Failed to execute report: " + e.getMessage(), e);
-        } finally {
-            // Log execution metrics
-            logExecutionMetrics(reportId, startTime, totalFilteredRows, executedQuery);
-        }
-    }
+//    @Transactional(readOnly = true)
+//    public ReportExecutionResultDto executeReport(Integer reportId, ReportQueryRequestDto request) {
+//        long startTime = System.currentTimeMillis();
+//        int totalFilteredRows = 0;
+//        String executedQuery = null;
+//
+//        log.info("Starting report execution for reportId: {}", reportId);
+//
+//        try {
+//            // Fetch report configuration
+//            ReportsEntity report = reportRepository.findById(reportId)
+//                    .orElseThrow(() -> new ReportNotFoundException(reportId));
+//
+//            // Validate report status
+//            if (!Boolean.TRUE.equals(report.getIsPublished())) {
+//                throw new InvalidReportStateException("Cannot execute unpublished report: " + reportId);
+//            }
+//
+//            // Get configured columns
+//            List<ReportColumnEntity> columns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
+//            if (columns.isEmpty()) {
+//                throw new InvalidReportStateException("Report has no configured columns: " + reportId);
+//            }
+//
+//            // Validate connection exists
+//            connectionService.validateConnectionExists(report.getConnectionId());
+//
+//            // Build and validate query
+//            List<Object> queryParams = new ArrayList<>();
+//            String sql = buildExecutionQuery(report, columns, request.getQuery(), queryParams);
+//            executedQuery = sql; // Store for metadata
+//
+//            // Execute query with timing
+//            long queryStartTime = System.currentTimeMillis();
+//            List<Map<String, Object>> rawData;
+//
+//            try {
+//                rawData = connectionService.executeQuery(
+//                        report.getConnectionId(),
+//                        sql,
+//                        queryParams.toArray()
+//                );
+//                totalFilteredRows = rawData.size(); // Store for metadata
+//            } catch (Exception e) {
+//                log.error("Query execution failed for report {}: {}", reportId, e.getMessage());
+//                throw new ReportExecutionException("Query execution failed", e);
+//            }
+//
+//            long queryEndTime = System.currentTimeMillis();
+//            log.debug("Query executed in {}ms, returned {} rows",
+//                    queryEndTime - queryStartTime, rawData.size());
+//
+//            // Format results
+//            List<Map<String, Object>> formattedData = formatResults(rawData, columns);
+//
+//            // Build cache key if caching is enabled
+//            String cacheKey = null;
+//            ZonedDateTime cacheExpiry = null;
+//            if (report.getCacheDuration() != null && report.getCacheDuration() > 0) {
+//                cacheKey = buildCacheKey(reportId, request);
+//                cacheExpiry = ZonedDateTime.now().plusMinutes(report.getCacheDuration());
+//            }
+//
+//            // Build execution metadata
+//            ReportExecutionResultDto.ExecutionMetadata metadata = ReportExecutionResultDto.ExecutionMetadata.builder()
+//                    .executionTimeMs(queryEndTime - queryStartTime)
+//                    .queryString(executedQuery)
+//                    .returnedRows(formattedData.size())
+//                    .filteredRows(totalFilteredRows)
+//                    .cacheExpiry(cacheExpiry)
+//                    .build();
+//
+//            // Build final result
+//            ReportExecutionResultDto result = ReportExecutionResultDto.builder()
+//                    .reportId(reportId)
+//                    .reportName(report.getReportName())
+//                    .columns(columns.stream()
+//                            .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
+//                            .map(this::mapColumnToDto)
+//                            .collect(Collectors.toList()))
+//                    .data(formattedData)
+//                    .totalRows(formattedData.size())
+//                    .executionTime(ZonedDateTime.now())
+//                    .metadata(metadata)
+//                    .build();
+//
+//            // Store in cache if enabled
+//            if (cacheKey != null) {
+//                cacheReport(cacheKey, result, report.getCacheDuration());
+//            }
+//
+//            long totalTime = System.currentTimeMillis() - startTime;
+//            log.info("Report {} executed successfully in {}ms, returned {} rows",
+//                    reportId, totalTime, formattedData.size());
+//
+//            return result;
+//
+//        } catch (ReportNotFoundException | InvalidReportStateException | InvalidQueryException e) {
+//            log.error("Report execution failed with validation error: {}", e.getMessage());
+//            throw e;
+//        } catch (Exception e) {
+//            log.error("Unexpected error during report execution for ID {}: {}", reportId, e.getMessage(), e);
+//            throw new ReportExecutionException("Failed to execute report: " + e.getMessage(), e);
+//        } finally {
+//            // Log execution metrics
+//            logExecutionMetrics(reportId, startTime, totalFilteredRows, executedQuery);
+//        }
+//    }
 
     private String buildExecutionQuery(ReportsEntity report, List<ReportColumnEntity> columns,
                                        QueryFilterDto filters, List<Object> params) {
@@ -202,13 +209,6 @@ public class ReportExecutionService {
             throw new InvalidQueryException("Invalid table name: " + tableName);
         }
         return tableName;
-    }
-
-    private List<Map<String, Object>> formatResults(List<Map<String, Object>> rawData,
-                                                    List<ReportColumnEntity> columns) {
-        return rawData.stream()
-                .map(row -> formatRow(row, columns))
-                .collect(Collectors.toList());
     }
 
     private Map<String, Object> formatRow(Map<String, Object> row, List<ReportColumnEntity> columns) {
@@ -388,6 +388,235 @@ public class ReportExecutionService {
         } finally {
             MDC.clear();
         }
+    }
+
+    @Transactional(readOnly = true)
+    public ReportExecutionResultDto executeReport(Integer reportId, ReportQueryRequestDto request) {
+        long startTime = System.currentTimeMillis();
+        log.info("Starting report execution for reportId: {} with request: {}", reportId, request);
+
+        try {
+            // Fetch report configuration
+            ReportsEntity report = reportRepository.findById(reportId)
+                    .orElseThrow(() -> new ReportNotFoundException(reportId));
+
+            // Validate report status
+            if (!Boolean.TRUE.equals(report.getIsPublished())) {
+                throw new InvalidReportStateException("Cannot execute unpublished report");
+            }
+
+            List<ReportColumnEntity> columns = columnRepository.findByReportIdOrderBySortPriorityAsc(reportId);
+            if (columns.isEmpty()) {
+                throw new InvalidReportStateException("Report has no configured columns");
+            }
+
+            // Build base query
+            String baseQuery = buildBaseQuery(report, columns, request.getQuery());
+            String countQuery = buildCountQuery(report, request.getQuery());
+            log.debug("Executing count query: {}", countQuery);
+
+            // Execute count query using JPA
+            Query nativeCountQuery = entityManager.createNativeQuery(countQuery);
+            addQueryParameters(nativeCountQuery, request.getQuery());
+            Long totalRecords = ((Number) nativeCountQuery.getSingleResult()).longValue();
+
+            // Get the requested page number (1-based from client), default to 1 if not specified
+            int requestedPage = (request.getPageNumber() != null && request.getPageNumber() > 0) ?
+                    request.getPageNumber() : 1;
+
+            // Convert to 0-based index for calculation
+            int pageIndex = requestedPage - 1;
+
+            // Determine page size - use request pageSize if provided, otherwise use configured default
+            int pageSize = (request.getPageSize() != null) ?
+                    request.getPageSize() : paginationConfig.getPageSize();
+
+            log.debug("Using page size: {} ({})", pageSize,
+                    request.getPageSize() != null ? "from request" : "default configuration");
+
+            // Calculate pagination
+            int totalPages = (int) Math.ceil((double) totalRecords / pageSize);
+
+            // Ensure requested page is within bounds (using 1-based page numbers)
+            int currentPage = Math.min(requestedPage, totalPages);
+            int offset = pageSize * pageIndex;
+
+            // Build paginated query
+            String paginatedQuery = baseQuery +
+                    " LIMIT " + pageSize +
+                    " OFFSET " + offset;
+
+            log.debug("Executing paginated query with page: {}, size: {}, offset: {}",
+                    currentPage, pageSize, offset);
+
+            // Execute paginated query using JPA
+            Query nativeQuery = entityManager.createNativeQuery(paginatedQuery);
+            addQueryParameters(nativeQuery, request.getQuery());
+            List<Object[]> results = nativeQuery.getResultList();
+
+            // Convert results to map format
+            List<Map<String, Object>> formattedData = formatResults(results, columns);
+
+            // Build execution metadata with query details
+            long executionTime = System.currentTimeMillis() - startTime;
+            ReportExecutionResultDto.ExecutionMetadata metadata = ReportExecutionResultDto.ExecutionMetadata.builder()
+                    .executionTimeMs(executionTime)
+                    .queryString(paginatedQuery)
+                    .returnedRows(formattedData.size())
+                    .filteredRows(totalRecords.intValue())
+                    .build();
+
+            // Build final result
+            ReportExecutionResultDto result = ReportExecutionResultDto.builder()
+                    .reportId(reportId)
+                    .reportName(report.getReportName())
+                    .columns(columns.stream()
+                            .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
+                            .map(this::mapColumnToDto)
+                            .collect(Collectors.toList()))
+                    .data(formattedData)
+                    .totalRows(totalRecords.intValue())
+                    .pageSize(pageSize)
+                    .currentPage(currentPage)  // Now using 1-based page number
+                    .totalPages(totalPages)
+                    .metadata(metadata)
+                    .executionTime(ZonedDateTime.now())
+                    .build();
+
+            log.info("Report execution completed for reportId: {}, page: {}/{}, size: {}, returned {} records out of {}",
+                    reportId, currentPage, totalPages, pageSize, formattedData.size(), totalRecords);
+
+            return result;
+
+        } catch (ReportNotFoundException | InvalidReportStateException e) {
+            log.error("Business error executing report {}: {}", reportId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Technical error executing report {}: {}", reportId, e.getMessage(), e);
+            throw new ReportExecutionException("Failed to execute report", e);
+        }
+    }
+
+    private String buildCountQuery(ReportsEntity report, QueryFilterDto filters) {
+        StringBuilder query = new StringBuilder("SELECT COUNT(*) FROM ");
+        query.append(report.getTableViewName());
+
+        if (filters != null && filters.getRules() != null && !filters.getRules().isEmpty()) {
+            query.append(" WHERE ").append(queryBuilderService.buildWhereClause(filters, new ArrayList<>()));
+        }
+
+        return query.toString();
+    }
+
+    private String buildBaseQuery(ReportsEntity report, List<ReportColumnEntity> columns, QueryFilterDto filters) {
+        StringBuilder query = new StringBuilder("SELECT ");
+
+        // Add column selections
+        String columnList = columns.stream()
+                .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
+                .map(col -> col.getSourceColumn())
+                .collect(Collectors.joining(", "));
+
+        query.append(columnList)
+                .append(" FROM ")
+                .append(report.getTableViewName());
+
+        // Add WHERE clause if filters exist
+        if (filters != null && filters.getRules() != null && !filters.getRules().isEmpty()) {
+            query.append(" WHERE ")
+                    .append(queryBuilderService.buildWhereClause(filters, new ArrayList<>()));
+        }
+
+        // Add ORDER BY clause based on column sort priorities
+        List<String> orderClauses = columns.stream()
+                .filter(col -> col.getSortPriority() != null && col.getSortPriority() > 0)
+                .sorted(Comparator.comparing(ReportColumnEntity::getSortPriority))
+                .map(col -> col.getSourceColumn() + " " +
+                        (col.getSortDirection() != null ? col.getSortDirection() : "ASC"))
+                .collect(Collectors.toList());
+
+        if (!orderClauses.isEmpty()) {
+            query.append(" ORDER BY ")
+                    .append(String.join(", ", orderClauses));
+        }
+
+        return query.toString();
+    }
+
+    private void addQueryParameters(Query query, QueryFilterDto filters) {
+        if (filters != null && filters.getRules() != null) {
+            List<Object> params = new ArrayList<>();
+            String whereClause = queryBuilderService.buildWhereClause(filters, params);
+
+            // Log the query and parameters
+            log.debug("Executing query with WHERE clause: {}", whereClause);
+            log.debug("Query parameters: {}", params);
+            for (int i = 0; i < params.size(); i++) {
+                query.setParameter(i + 1, params.get(i));
+            }
+        }
+    }
+
+    private List<Map<String, Object>> formatResults(List<Object[]> results, List<ReportColumnEntity> columns) {
+        List<ReportColumnEntity> visibleColumns = columns.stream()
+                .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
+                .collect(Collectors.toList());
+
+        return results.stream()
+                .map(row -> {
+                    Map<String, Object> formattedRow = new LinkedHashMap<>();
+                    for (int i = 0; i < visibleColumns.size(); i++) {
+                        ReportColumnEntity column = visibleColumns.get(i);
+                        formattedRow.put(column.getSourceColumn(),
+                                formatValue(row[i], column.getDataType(), column.getFormattingJson()));
+                    }
+                    return formattedRow;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private String buildPaginatedQuery(ReportsEntity report, List<ReportColumnEntity> columns,
+                                       QueryFilterDto filters, int currentPage, int pageSize) {
+        StringBuilder query = new StringBuilder("SELECT ");
+
+        // Add column selections
+        String columnList = columns.stream()
+                .filter(col -> Boolean.TRUE.equals(col.getIsVisible()))
+                .map(col -> String.format("%s AS \"%s\"",
+                        sanitizeColumnName(col.getSourceColumn()),
+                        sanitizeColumnName(col.getSourceColumn())))
+                .collect(Collectors.joining(", "));
+        query.append(columnList);
+
+        // Add FROM clause
+        query.append(" FROM ").append(sanitizeTableName(report.getTableViewName()));
+
+        // Add WHERE clause if filters exist
+        if (filters != null && filters.getRules() != null && !filters.getRules().isEmpty()) {
+            String whereClause = queryBuilderService.buildWhereClause(filters, new ArrayList<>());
+            if (!whereClause.isEmpty()) {
+                query.append(" WHERE ").append(whereClause);
+            }
+        }
+
+        // Add ORDER BY clause based on column sort priorities
+        List<String> orderClauses = columns.stream()
+                .filter(col -> col.getSortPriority() != null && col.getSortPriority() > 0)
+                .sorted(Comparator.comparing(ReportColumnEntity::getSortPriority))
+                .map(col -> String.format("%s %s",
+                        sanitizeColumnName(col.getSourceColumn()),
+                        col.getSortDirection() != null ? col.getSortDirection() : "ASC"))
+                .collect(Collectors.toList());
+
+        if (!orderClauses.isEmpty()) {
+            query.append(" ORDER BY ").append(String.join(", ", orderClauses));
+        }
+
+        // Add pagination
+        query.append(" LIMIT ").append(pageSize)
+                .append(" OFFSET ").append(currentPage * pageSize);
+
+        return query.toString();
     }
 }
 

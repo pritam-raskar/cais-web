@@ -104,3 +104,8 @@ management:
       enabled: true
     mongo:
       enabled: true
+
+
+reports:
+  execution:
+    page-size: 50  # Default page size for report execution

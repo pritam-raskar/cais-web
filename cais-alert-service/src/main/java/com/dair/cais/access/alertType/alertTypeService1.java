@@ -37,10 +37,22 @@ public class alertTypeService1 {
     }
 
     // Delete an Alert Type by ID
-    public void deleteAlertType(String alertTypeId) {
+//    public void deleteAlertType(String alertTypeId) {
+//        Optional<alertTypeEntity> alertTypeEntity = alertTypeRepository.findByAlertTypeId(alertTypeId);
+//        if (alertTypeEntity.isPresent()) {
+//            alertTypeRepository.delete(alertTypeEntity.get());
+//        } else {
+//            throw new RuntimeException("AlertType not found with id: " + alertTypeId);
+//        }
+//    }
+
+    public alertType deleteAlertType(String alertTypeId) {
         Optional<alertTypeEntity> alertTypeEntity = alertTypeRepository.findByAlertTypeId(alertTypeId);
         if (alertTypeEntity.isPresent()) {
-            alertTypeRepository.delete(alertTypeEntity.get());
+            alertTypeEntity existingAlertTypeEntity = alertTypeEntity.get();
+            existingAlertTypeEntity.setIsActive(false);
+            alertTypeEntity savedEntity = alertTypeRepository.save(existingAlertTypeEntity);
+            return alertTypeMapper.toDto(savedEntity);
         } else {
             throw new RuntimeException("AlertType not found with id: " + alertTypeId);
         }

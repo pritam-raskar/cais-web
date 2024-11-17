@@ -17,7 +17,7 @@ public class UserPermissionController {
 
     private final UserPermissionService userPermissionService;
 
-    @PostMapping("/refresh/{userId}")
+    @PostMapping("/user/refresh/{userId}")
     public ResponseEntity<String> refreshPermissions(@PathVariable String userId) {
         try {
             userPermissionService.refreshUserPermissions(userId);

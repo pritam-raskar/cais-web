@@ -1,12 +1,16 @@
 package com.dair.cais.alert;
 
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
+import com.dair.cais.access.user.UserEntity;
+import com.dair.cais.access.user.UserRepository;
 import com.dair.cais.alert.rdbms.RdbmsAlertEntity;
 import com.dair.cais.alert.rdbms.RdbmsAlertMapper;
 import com.dair.cais.alert.rdbms.RdbmsAlertRepository;
 import com.dair.cais.audit.AuditLogRequest;
 import com.dair.cais.audit.AuditTrailService;
 import com.dair.cais.common.config.CaisAlertConstants;
+import com.dair.cais.organization.OrganizationFamilyEntity;
+import com.dair.cais.organization.OrganizationFamilyRepository;
 import com.dair.cais.steps.Step;
 import com.dair.cais.steps.StepRepository;
 import com.dair.cais.steps.StepStatus;
@@ -14,14 +18,18 @@ import com.dair.cais.steps.StepStatusRepository;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -42,6 +50,13 @@ public class AlertService {
    private final RdbmsAlertRepository rdbmsAlertRepository;
    private final AuditTrailService auditTrailService;
    private final UserPermissionService userPermissionService;
+   private final ObjectMapper objectMapper;
+   private final UserRepository userRepository;
+   private final OrganizationFamilyRepository orgFamilyRepository;
+
+
+
+
 
    // Base Operations
    public List<Alert> getAllActiveAlerts() {
@@ -170,25 +185,52 @@ public class AlertService {
 
    @Transactional
    public Alert updateTotalScore(String alertId, int totalScore) {
-      log.debug("Starting synchronized total score update for alertId: {}", alertId);
+      log.debug("Starting synchronized score update for alertId: {}", alertId);
       try {
-         // Update MongoDB
-         Alert updatedMongoAlert = alertRepository.updateTotalScore(alertId, totalScore);
-
-         // Update RDBMS
-         rdbmsAlertRepository.findByAlertId(alertId)
-                 .map(entity -> {
-                    entity.setTotalScore((double) totalScore);
-                    entity.setLastUpdateDate(LocalDateTime.now());
-                    return rdbmsAlertRepository.save(entity);
-                 })
+         // First check if record exists in both DBs
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
                  .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
 
-         log.debug("Successfully updated total score in both databases for alertId: {}", alertId);
-         return updatedMongoAlert;
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+
+         // Update MongoDB
+         Query query = new Query(Criteria.where("alertId").is(alertId));
+         Update update = new Update();
+         update.set("totalScore", totalScore);
+         update.set("lastUpdateDate", LocalDateTime.now().toString());
+//         update.set("reasonDetails.reasons.scoreTotal", totalScore);
+
+         AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
+                 query,
+                 update,
+                 FindAndModifyOptions.options().returnNew(true),
+                 AlertEntity.class,
+                 CaisAlertConstants.ALERTS
+         );
+
+         if (updatedMongoAlert == null) {
+            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+         }
+
+         // Update PostgreSQL
+         rdbmsAlert.setTotalScore((double) totalScore);
+         rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+
+         // Convert MongoDB's Map to JSON string for PostgreSQL
+         String reasonDetailsJson = objectMapper.writeValueAsString(updatedMongoAlert.getReasonDetails());
+//         rdbmsAlert.setReasonDetails(reasonDetailsJson);
+
+         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
+         log.info("Successfully updated scores in both databases for alertId: {}", alertId);
+
+         return alertMapper.toModel(updatedMongoAlert);
       } catch (Exception e) {
-         log.error("Failed to update total score for alertId: {}", alertId, e);
-         throw new RuntimeException("Failed to update total score in databases", e);
+         log.error("Failed to update scores for alertId: {}. Rolling back both databases.", alertId, e);
+         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+         throw new RuntimeException("Failed to update scores in databases", e);
       }
    }
 
@@ -214,29 +256,65 @@ public class AlertService {
       return updatedAlert;
    }
 
+
    @Transactional
    public Alert updateOwnerId(String alertId, String ownerId) {
-      log.debug("Starting synchronized owner update for alertId: {}", alertId);
-      try {
-         // Update MongoDB
-         Alert updatedMongoAlert = alertRepository.updateOwnerId(alertId, ownerId);
+      log.debug("Starting synchronized ownerId update for alertId: {}", alertId);
 
-         // Update RDBMS
-         rdbmsAlertRepository.findByAlertId(alertId)
-                 .map(entity -> {
-                    entity.setOwnerId(ownerId);
-                    entity.setLastUpdateDate(LocalDateTime.now());
-                    return rdbmsAlertRepository.save(entity);
-                 })
+      try {
+         // Validate if the alert exists in MongoDB
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+
+         // Validate if the alert exists in PostgreSQL
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
                  .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
 
-         log.debug("Successfully updated owner in both databases for alertId: {}", alertId);
-         return updatedMongoAlert;
+         // Fetch the user by ID from the repository
+         UserEntity user = userRepository.findById(ownerId)
+                 .orElseThrow(() -> new CaisNotFoundException("User not found with id: " + ownerId));
+
+         // Extract the username
+         String userName = user.getUserLoginName();
+
+         // Update MongoDB
+         Query query = new Query(Criteria.where("alertId").is(alertId));
+         Update update = new Update();
+         update.set("ownerId", ownerId);
+         update.set("ownerName", userName);
+         update.set("lastUpdateDate", LocalDateTime.now().toString());
+
+         AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
+                 query,
+                 update,
+                 FindAndModifyOptions.options().returnNew(true),
+                 AlertEntity.class,
+                 CaisAlertConstants.ALERTS
+         );
+
+         if (updatedMongoAlert == null) {
+            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+         }
+
+         // Update PostgreSQL
+         rdbmsAlert.setOwnerId(ownerId);
+         rdbmsAlert.setOwnerName(userName);
+         rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
+
+         log.info("Successfully updated owner in both databases for alertId: {}", alertId);
+         return alertMapper.toModel(updatedMongoAlert);
       } catch (Exception e) {
-         log.error("Failed to update owner for alertId: {}", alertId, e);
+         log.error("Failed to update owner for alertId: {}. Rolling back both databases.", alertId, e);
+         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
          throw new RuntimeException("Failed to update owner in databases", e);
       }
    }
+
+
+
 
    @Transactional
    public Alert updateOwnerIdWithAudit(String alertId, String ownerId, AuditLogRequest auditLogRequest) {
@@ -261,27 +339,74 @@ public class AlertService {
    }
 
    @Transactional
-   public Alert updateOrgUnitId(String alertId, String orgUnitId) {
-      log.debug("Starting synchronized org unit update for alertId: {}", alertId);
+   public Alert updateOrgUnitId(String alertId, String orgUnitId)  {
+      log.debug("Starting synchronized orgUnitId update for alertId: {}", alertId);
       try {
-         // Update MongoDB
-         Alert updatedMongoAlert = alertRepository.updateOrgUnitId(alertId, orgUnitId);
-
-         // Update RDBMS
-         rdbmsAlertRepository.findByAlertId(alertId)
-                 .map(entity -> {
-                    entity.setPreviousOrgUnitId(entity.getOrgUnitId());
-                    entity.setOrgUnitId(orgUnitId);
-                    entity.setLastUpdateDate(LocalDateTime.now());
-                    return rdbmsAlertRepository.save(entity);
-                 })
+         // First check if record exists in both DBs
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
                  .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
 
-         log.debug("Successfully updated org unit in both databases for alertId: {}", alertId);
-         return updatedMongoAlert;
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+
+
+         Optional<OrganizationFamilyEntity> organizationTree = orgFamilyRepository.findByOrgKey(orgUnitId);
+         if (organizationTree.isEmpty()) {
+            throw new CaisNotFoundException("OrgFamily not found with id: " + orgUnitId);
+         }
+
+         OrganizationFamilyEntity orgEntity = organizationTree.orElseThrow(() ->
+                 new CaisNotFoundException("OrgFamily not found with id: " + orgUnitId)
+         );
+
+         String orgHierarchyorg = orgEntity.getOrgFamily();
+
+
+         Query query = null;
+         query = new Query(Criteria.where("alertId").is(alertId));
+         String previousOrgUnitId = alertRepository.findByAlertId(alertId).getOrgUnitId();
+         // Update MongoDB
+
+         Update update = new Update();
+         update.set("orgUnitId", orgUnitId);
+         update.set("previousOrgUnitId", previousOrgUnitId);
+         update.set("orgFamily", orgHierarchyorg);
+         update.set("isOrgUnitUpdated" , true);
+         update.set("lastUpdateDate", LocalDateTime.now().toString());
+
+
+         AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
+                 query,
+                 update,
+                 FindAndModifyOptions.options().returnNew(true),
+                 AlertEntity.class,
+                 CaisAlertConstants.ALERTS
+         );
+
+         if (updatedMongoAlert == null) {
+            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+         }
+
+
+
+         // Update PostgreSQL
+         rdbmsAlert.setOrgUnitId(orgUnitId);
+         rdbmsAlert.setPreviousOrgUnitId(previousOrgUnitId);
+         rdbmsAlert.setOrgFamily(orgHierarchyorg);
+         rdbmsAlert.setIsOrgUnitUpdated(true);
+         rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+
+
+         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
+         log.info("Successfully updated orgId in both databases for alertId: {}", alertId);
+
+         return alertMapper.toModel(updatedMongoAlert);
       } catch (Exception e) {
-         log.error("Failed to update org unit for alertId: {}", alertId, e);
-         throw new RuntimeException("Failed to update org unit in databases", e);
+         log.error("Failed to update orgId for alertId: {}. Rolling back both databases.", alertId, e);
+         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+         throw new RuntimeException("Failed to update orgId in databases", e);
       }
    }
 
@@ -307,56 +432,22 @@ public class AlertService {
       return updatedAlert;
    }
 
-   @Transactional
-   public Alert updateStatus(String alertId, String statusId) {
-      log.debug("Starting synchronized status update for alertId: {}", alertId);
-      try {
-         // Update MongoDB
-         Alert updatedMongoAlert = alertRepository.updateStatus(alertId, statusId);
 
-         // Update RDBMS
-         rdbmsAlertRepository.findByAlertId(alertId)
-                 .map(entity -> {
-                    entity.setStatus(statusId);
-                    entity.setLastUpdateDate(LocalDateTime.now());
-                    return rdbmsAlertRepository.save(entity);
-                 })
+   @Transactional
+   public  Alert changeStep(String alertId, Long stepId)  {
+      log.debug("Starting synchronized  change step update for alertId: {}", alertId);
+      try {
+
+         // First check if record exists in both DBs
+
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
                  .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
 
-         log.debug("Successfully updated status in both databases for alertId: {}", alertId);
-         return updatedMongoAlert;
-      } catch (Exception e) {
-         log.error("Failed to update status for alertId: {}", alertId, e);
-         throw new RuntimeException("Failed to update status in databases", e);
-      }
-   }
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
 
-   @Transactional
-   public Alert updateStatusWithAudit(String alertId, String statusId, AuditLogRequest auditLogRequest) {
-      Alert oldAlert = getAlertOnId(alertId);
-      Alert updatedAlert = updateStatus(alertId, statusId);
-
-      auditLogRequest.setAffectedItemType("Alert");
-      auditLogRequest.setAffectedItemId(alertId);
-      auditLogRequest.setOldValue(oldAlert.getStatus());
-      auditLogRequest.setNewValue(statusId);
-      auditTrailService.logAction(auditLogRequest.getUserId(),
-              auditLogRequest.getUserRole(),
-              auditLogRequest.getActionId(),
-              auditLogRequest.getDescription(),
-              auditLogRequest.getCategory(),
-              auditLogRequest.getAffectedItemType(),
-              auditLogRequest.getAffectedItemId(),
-              auditLogRequest.getOldValue(),
-              auditLogRequest.getNewValue());
-
-      return updatedAlert;
-   }
-
-   @Transactional
-   public Alert changeStep(String alertId, Long stepId) {
-      log.debug("Starting synchronized step change for alertId: {} to step: {}", alertId, stepId);
-      try {
          Step step = stepsRepository.findByStepId(stepId);
          if (step == null) {
             throw new CaisNotFoundException("Step not found with id: " + stepId);
@@ -367,29 +458,51 @@ public class AlertService {
             throw new CaisNotFoundException("Step status not found for step id: " + stepId);
          }
 
+         String StepName = step.getStepName();
+         String Status = stepStatus.getStepName();
+
+
+
+         Query query = null;
+         query = new Query(Criteria.where("alertId").is(alertId));
          // Update MongoDB
-         AlertEntity updatedMongoEntity = alertRepository.changeStep(alertId, stepId,
-                 step.getStepName(), stepStatus.getStepName());
 
-         // Update RDBMS
-         rdbmsAlertRepository.findByAlertId(alertId)
-                 .map(entity -> {
-                    entity.setAlertStepId(stepId.toString());
-                    entity.setAlertStepName(step.getStepName());
-                    entity.setStatus(stepStatus.getStepName());
-                    entity.setLastUpdateDate(LocalDateTime.now());
-                    return rdbmsAlertRepository.save(entity);
-                 })
-                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
+         Update update = new Update();
+         update.set("alertStepName", StepName);
+         update.set("alertStepId", stepId);
+         update.set("status", Status);
+         update.set("lastUpdateDate", LocalDateTime.now().toString());
 
-         log.debug("Successfully changed step in both databases for alertId: {}", alertId);
-         return alertMapper.toModel(updatedMongoEntity);
+
+         AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
+                 query,
+                 update,
+                 FindAndModifyOptions.options().returnNew(true),
+                 AlertEntity.class,
+                 CaisAlertConstants.ALERTS
+         );
+
+         if (updatedMongoAlert == null) {
+            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+         }
+
+         // Update PostgreSQL
+         rdbmsAlert.setStatus(Status);
+         rdbmsAlert.setAlertStepId(String.valueOf(stepId));
+         rdbmsAlert.setAlertStepName(StepName);
+         rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+
+
+         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
+         log.info("Successfully updated step in both databases for alertId: {}", alertId);
+
+         return alertMapper.toModel(updatedMongoAlert);
       } catch (Exception e) {
-         log.error("Failed to change step for alertId: {}", alertId, e);
-         throw new RuntimeException("Failed to change step in databases", e);
+         log.error("Failed to update step for alertId: {}. Rolling back both databases.", alertId, e);
+         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+         throw new RuntimeException("Failed to update osteprgId in databases", e);
       }
    }
-
    @Transactional
    public Alert changeStepWithAudit(String alertId, Long stepId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);

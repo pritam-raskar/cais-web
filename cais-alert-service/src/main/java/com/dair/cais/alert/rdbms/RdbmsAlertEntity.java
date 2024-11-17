@@ -12,13 +12,12 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @Entity
-@Table(name = "alerts" , schema = "info_alert")
+@Table(name = "cm_alerts" , schema = "info_alert")
 @EntityListeners(AuditingEntityListener.class)
 public class RdbmsAlertEntity {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "alerts_id_seq")
-    @SequenceGenerator(name = "alerts_id_seq", sequenceName = "alerts_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(name = "alert_id", nullable = false, unique = true)
@@ -66,7 +65,7 @@ public class RdbmsAlertEntity {
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted;
 
-    @Column(name = "org_unit_id", nullable = false)
+    @Column(name = "org_id", nullable = false)
     private String orgUnitId;
 
     @Column(name = "org_family", nullable = false)

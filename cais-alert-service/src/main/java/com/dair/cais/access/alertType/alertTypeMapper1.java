@@ -14,6 +14,7 @@ public class alertTypeMapper1 {
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setAtyId(entity.getAtyId());
+        dto.setIsActive(entity.getIsActive());
 
         return dto;
     }
@@ -24,6 +25,7 @@ public class alertTypeMapper1 {
         entity.setAlertTypeId(dto.getAlertTypeId());
         entity.setTypeSlug(dto.getTypeSlug());
         entity.setTypeName(dto.getTypeName());
+        entity.setIsActive(dto.getIsActive());
         return entity;
     }
 }

@@ -9,9 +9,8 @@ import java.sql.Timestamp;
 public class FilterResponseDto {
     private Long filterId;
     private String userId;
-    private Long entityTypeId;
-    private String entityName;
     private String entityIdentifier;
+    private String sourceIdentifier;
     private String filterName;
     private String filterDescription;
     private Boolean isDefault;

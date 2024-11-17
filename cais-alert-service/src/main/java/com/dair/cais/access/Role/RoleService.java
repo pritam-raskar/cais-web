@@ -71,6 +71,14 @@ public class RoleService {
     }
 
     @Transactional(readOnly = true)
+    public Role getRoleById(Integer roleId) {
+        log.info("Fetching role by Id: {}", roleId);
+        RoleEntity entity = roleRepository.findById(roleId)
+                .orElseThrow(() -> new EntityNotFoundException("Role not found with Id: " + roleId));
+        return roleMapper.toModel(entity);
+    }
+
+    @Transactional(readOnly = true)
     public List<Role> getAllRoles() {
         log.info("Fetching all roles");
         List<RoleEntity> entities = roleRepository.findAll();
@@ -116,4 +124,5 @@ public class RoleService {
                 .orElseThrow(() -> new EntityNotFoundException("Role not found with name: " + roleName));
         return userOrgRoleMappingRepository.findUsersByRole(role);
     }
+
 }

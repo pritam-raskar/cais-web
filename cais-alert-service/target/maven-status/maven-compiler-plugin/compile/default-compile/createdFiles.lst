@@ -159,6 +159,7 @@ com/dair/cais/util/StringIntegerUserType.class
 com/dair/cais/alert/reason/AlertTransitionReasonService.class
 com/dair/cais/type/AlertTypeService.class
 com/dair/cais/steps/StepStatus.class
+com/dair/cais/filter/service/SourceIdentifierService.class
 com/dair/cais/alert/checklist/AlertStepChecklist.class
 com/dair/cais/attachment/AttachmentMapper.class
 com/dair/cais/connector/ConnectorRepository.class

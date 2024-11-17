@@ -2,6 +2,7 @@ package com.dair.cais.filter.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.Comment;
 import java.sql.Timestamp;
 
 @Data
@@ -22,6 +23,10 @@ public class UserSavedFilter {
 
     @Column(name = "entity_identifier", nullable = false)
     private String entityIdentifier;
+
+    @Column(name = "source_identifier")
+    @Comment("Stores reference ID for specific entity types (e.g., report_id for Analytics)")
+    private String sourceIdentifier;
 
     @Column(name = "filter_name", nullable = false)
     private String filterName;

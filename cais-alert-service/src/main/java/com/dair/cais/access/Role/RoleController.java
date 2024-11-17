@@ -69,6 +69,19 @@ public class RoleController {
         return ResponseEntity.ok(role);
     }
 
+    @GetMapping("/id/{roleId}")
+    @Operation(summary = "Get role by Id",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Role found"),
+                    @ApiResponse(responseCode = "404", description = "Role not found")
+            })
+    public ResponseEntity<Role> getRoleById(
+            @Parameter(description = "Name of the role to retrieve") @PathVariable Integer roleId) {
+        log.debug("Fetching role by Id: {}", roleId);
+        Role role = roleService.getRoleById(roleId);
+        return ResponseEntity.ok(role);
+    }
+
     @GetMapping
     @Operation(summary = "Get all roles")
     public ResponseEntity<List<Role>> getAllRoles() {

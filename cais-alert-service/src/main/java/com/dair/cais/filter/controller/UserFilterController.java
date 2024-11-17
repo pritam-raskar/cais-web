@@ -1,7 +1,10 @@
 // File: com/dair/cais/filter/controller/UserFilterController.java
 package com.dair.cais.filter.controller;
 
+import com.dair.cais.filter.domain.FilterEntityType;
 import com.dair.cais.filter.dto.*;
+import com.dair.cais.filter.exception.FilterNotFoundException;
+import com.dair.cais.filter.repository.FilterEntityTypeRepository;
 import com.dair.cais.filter.service.UserFilterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,12 +17,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST controller for managing user-specific filters.
+ * Provides endpoints for CRUD operations and filter management.
+ */
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/filters")
 @RequiredArgsConstructor
@@ -27,11 +35,12 @@ import java.util.List;
 public class UserFilterController {
 
     private final UserFilterService userFilterService;
+    private final FilterEntityTypeRepository filterEntityTypeRepository;
 
     @Operation(summary = "Get all filters")
     @GetMapping
     public ResponseEntity<List<FilterResponseDto>> getAllFilters() {
-        log.debug("Fetching all filters");
+        log.debug("REST request to get all filters");
         return ResponseEntity.ok(userFilterService.getAllFilters());
     }
 
@@ -39,9 +48,9 @@ public class UserFilterController {
     @PostMapping
     public ResponseEntity<FilterResponseDto> createFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("userId") String userId,
+            @RequestParam String userId,
             @Valid @RequestBody UserFilterCreateDto createDto) {
-        log.debug("Creating new filter for user: {}", userId);
+        log.debug("REST request to create new filter for user: {}", userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(userFilterService.createFilter(userId, createDto));
     }
@@ -50,10 +59,11 @@ public class UserFilterController {
     @PutMapping("/{filterId}")
     public ResponseEntity<FilterResponseDto> updateFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId,
             @Valid @RequestBody UserFilterUpdateDto updateDto) {
-        log.debug("Updating filter: {} for user: {}", filterId, userId);
+        log.debug("REST request to update filter: {} for user: {}", filterId, userId);
         return ResponseEntity.ok(userFilterService.updateFilter(userId, filterId, updateDto));
     }
 
@@ -61,9 +71,10 @@ public class UserFilterController {
     @DeleteMapping("/{filterId}")
     public ResponseEntity<Void> deleteFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId) {
-        log.debug("Deleting filter: {} for user: {}", filterId, userId);
+        log.debug("REST request to delete filter: {} for user: {}", filterId, userId);
         userFilterService.deleteFilter(userId, filterId);
         return ResponseEntity.noContent().build();
     }
@@ -72,9 +83,10 @@ public class UserFilterController {
     @GetMapping("/{filterId}")
     public ResponseEntity<FilterResponseDto> getFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId) {
-        log.debug("Fetching filter: {} for user: {}", filterId, userId);
+        log.debug("REST request to get filter: {} for user: {}", filterId, userId);
         return ResponseEntity.ok(userFilterService.getFilter(userId, filterId));
     }
 
@@ -82,24 +94,37 @@ public class UserFilterController {
     @GetMapping("/user")
     public ResponseEntity<List<FilterResponseDto>> getUserFilters(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
-            @Parameter(description = "Entity Type ID", required = true)
-            @RequestParam Long entityTypeId,
+            @RequestParam String userId,
             @Parameter(description = "Entity Identifier", required = true)
             @RequestParam String entityIdentifier) {
-        log.debug("Fetching filters for user: {} and entity type: {}", userId, entityTypeId);
-        return ResponseEntity.ok(userFilterService.getUserFilters(userId, entityTypeId, entityIdentifier));
+        log.debug("REST request to get filters for user: {} and entity identifier: {}",
+                userId, entityIdentifier);
+
+        FilterEntityType entityType = filterEntityTypeRepository
+                .findByEntityNameIgnoreCase(entityIdentifier)
+                .orElseThrow(() -> new FilterNotFoundException("Entity type not found: " + entityIdentifier));
+
+        return ResponseEntity.ok(userFilterService.getUserFilters(
+                userId,
+                entityType.getEntityTypeId(),
+                entityIdentifier));
     }
 
     @Operation(summary = "Get public filters for an entity")
     @GetMapping("/public")
     public ResponseEntity<List<FilterResponseDto>> getPublicFilters(
-            @Parameter(description = "Entity Type ID", required = true)
-            @RequestParam Long entityTypeId,
             @Parameter(description = "Entity Identifier", required = true)
             @RequestParam String entityIdentifier) {
-        log.debug("Fetching public filters for entity type: {}", entityTypeId);
-        return ResponseEntity.ok(userFilterService.getPublicFilters(entityTypeId, entityIdentifier));
+        log.debug("REST request to get public filters for entity identifier: {}",
+                entityIdentifier);
+
+        FilterEntityType entityType = filterEntityTypeRepository
+                .findByEntityNameIgnoreCase(entityIdentifier)
+                .orElseThrow(() -> new FilterNotFoundException("Entity type not found: " + entityIdentifier));
+
+        return ResponseEntity.ok(userFilterService.getPublicFilters(
+                entityType.getEntityTypeId(),
+                entityIdentifier));
     }
 
     @Operation(summary = "Search filters")
@@ -108,7 +133,7 @@ public class UserFilterController {
             @Parameter(description = "Search term")
             @RequestParam(required = false) String searchTerm,
             @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("Searching filters with term: {}", searchTerm);
+        log.debug("REST request to search filters with term: {}", searchTerm);
         return ResponseEntity.ok(userFilterService.searchFilters(searchTerm, pageable));
     }
 
@@ -116,9 +141,10 @@ public class UserFilterController {
     @PutMapping("/{filterId}/default")
     public ResponseEntity<FilterResponseDto> setDefaultFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId) {
-        log.debug("Setting filter: {} as default for user: {}", filterId, userId);
+        log.debug("REST request to set filter: {} as default for user: {}", filterId, userId);
         return ResponseEntity.ok(userFilterService.setDefaultFilter(userId, filterId));
     }
 
@@ -126,9 +152,11 @@ public class UserFilterController {
     @PutMapping("/{filterId}/public")
     public ResponseEntity<FilterResponseDto> togglePublicAccess(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId) {
-        log.debug("Toggling public access for filter: {} by user: {}", filterId, userId);
+        log.debug("REST request to toggle public access for filter: {} by user: {}",
+                filterId, userId);
         return ResponseEntity.ok(userFilterService.togglePublicAccess(userId, filterId));
     }
 
@@ -136,11 +164,13 @@ public class UserFilterController {
     @PostMapping("/{filterId}/copy")
     public ResponseEntity<FilterResponseDto> copyFilter(
             @Parameter(description = "User ID", required = true)
-            @RequestHeader("X-User-Id") String userId,
+            @RequestParam String userId,
+            @Parameter(description = "Filter ID", required = true)
             @PathVariable Long filterId,
             @Parameter(description = "New filter name", required = true)
             @RequestParam String newName) {
-        log.debug("Copying filter: {} for user: {} with new name: {}", filterId, userId, newName);
+        log.debug("REST request to copy filter: {} for user: {} with new name: {}",
+                filterId, userId, newName);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(userFilterService.copyFilter(userId, filterId, newName));
     }

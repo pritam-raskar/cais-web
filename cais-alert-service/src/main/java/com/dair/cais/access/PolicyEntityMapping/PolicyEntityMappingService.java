@@ -7,7 +7,7 @@ import com.dair.cais.access.entity.SystemEntityRepository;
 import com.dair.cais.access.modules.ModuleRepository;
 import com.dair.cais.access.policy.PolicyEntity;
 import com.dair.cais.access.policy.PolicyRepository;
-import com.dair.cais.access.reports.ReportRepository;
+import com.dair.cais.reports.repository.ReportsRepository;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class PolicyEntityMappingService {
 
     private final alertTypeRepository1 alertTypeRepository;
     private final ModuleRepository moduleRepository;
-    private final ReportRepository reportRepository;
+    private final ReportsRepository reportRepository;
 
     @Transactional(readOnly = true)
     public List<PolicyEntityMapping> getAllMappings() {

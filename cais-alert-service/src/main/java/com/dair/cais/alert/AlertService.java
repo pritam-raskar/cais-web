@@ -18,14 +18,11 @@ import com.dair.cais.steps.StepStatusRepository;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -38,7 +35,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -78,70 +74,108 @@ public class AlertService {
          throw new AlertValidationException("Alert validation failed", validationErrors);
       }
 
+      AlertEntity savedMongoEntity = null;
+
       try {
-         // Set timestamps with proper formatting
+         // Set timestamps
          LocalDateTime now = LocalDateTime.now();
          String formattedDateTime = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
-         alert.setCreateDate(formattedDateTime);
-         alert.setLastUpdateDate(formattedDateTime);
-         alert.setCreatedAt(now);
-         alert.setUpdatedAt(now);
+         // Create a copy of the alert to avoid modifying the input
+         Alert processedAlert = new Alert();
+         BeanUtils.copyProperties(alert, processedAlert);
 
-         // Format dates in reasonDetails and customFields if they exist
-         if (alert.getReasonDetails() != null) {
-            formatDatesInMap(alert.getReasonDetails());
-         }
-         if (alert.getCustomFields() != null) {
-            formatDatesInMap(alert.getCustomFields());
-         }
+         // Set only the system-managed dates
+         processedAlert.setCreateDate(formattedDateTime);
+         processedAlert.setLastUpdateDate(formattedDateTime);
+         processedAlert.setCreatedAt(now);
+         processedAlert.setUpdatedAt(now);
 
-         // Create in MongoDB
-         AlertEntity mongoEntity = alertMapper.toEntity(alert);
-         AlertEntity savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
+         // Create in MongoDB first
+         AlertEntity mongoEntity = alertMapper.toEntity(processedAlert);
+         savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
+
+         if (savedMongoEntity == null) {
+            throw new AlertCreationException("Failed to save alert in MongoDB", null);
+         }
 
          // Create in RDBMS
-         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(alert);
-         rdbmsAlertRepository.save(rdbmsEntity);
+         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(processedAlert);
+         try {
+            rdbmsAlertRepository.save(rdbmsEntity);
+         } catch (Exception e) {
+            // If RDBMS fails, manually rollback MongoDB
+            if (savedMongoEntity != null) {
+               try {
+                  alertRepository.deleteById(savedMongoEntity.getAlertId());
+                  log.debug("Successfully rolled back from Mongo for alertId: {}", alert.getAlertId());
+               } catch (Exception deleteEx) {
+                  log.error("Failed to rollback MongoDB save for alertId: {}", alert.getAlertId(), deleteEx);
+               }
+            }
+            throw new AlertCreationException("Failed to save alert in RDBMS", e);
+         }
 
          log.debug("Successfully created alert in both databases for alertId: {}", alert.getAlertId());
          return alertMapper.toModel(savedMongoEntity);
 
       } catch (Exception e) {
-         log.error("Failed to create alert: {}", alert.getAlertId(), e);
+         // Ensure MongoDB is rolled back if anything fails
+         if (savedMongoEntity != null) {
+            try {
+               alertRepository.deleteById(savedMongoEntity.getAlertId());
+            } catch (Exception deleteEx) {
+               log.error("Failed to rollback MongoDB save for alertId: {}", alert.getAlertId(), deleteEx);
+            }
+         }
+         log.error("Failed to create alert: {}. Error: {}", alert.getAlertId(), e.getMessage(), e);
          throw new AlertCreationException("Failed to create alert in databases", e);
       }
    }
 
    @SuppressWarnings("unchecked")
    private void formatDatesInMap(Map<String, Object> map) {
-      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
       for (Map.Entry<String, Object> entry : map.entrySet()) {
          Object value = entry.getValue();
-         if (value instanceof LocalDateTime) {
-            entry.setValue(((LocalDateTime) value).format(formatter));
+         if (value instanceof String && isDateString((String) value)) {
+            // Leave the date string as is if it's already in the correct format
+            continue;
          } else if (value instanceof Map) {
             formatDatesInMap((Map<String, Object>) value);
          } else if (value instanceof List) {
-            formatDatesInList((List<Object>) value, formatter);
+            formatDatesInList((List<Object>) value);
          }
       }
    }
 
    @SuppressWarnings("unchecked")
-   private void formatDatesInList(List<Object> list, DateTimeFormatter formatter) {
+   private void formatDatesInList(List<Object> list) {
       for (int i = 0; i < list.size(); i++) {
          Object item = list.get(i);
-         if (item instanceof LocalDateTime) {
-            list.set(i, ((LocalDateTime) item).format(formatter));
+         if (item instanceof String && isDateString((String) item)) {
+            // Leave the date string as is if it's already in the correct format
+            continue;
          } else if (item instanceof Map) {
             formatDatesInMap((Map<String, Object>) item);
          } else if (item instanceof List) {
-            formatDatesInList((List<Object>) item, formatter);
+            formatDatesInList((List<Object>) item);
          }
       }
    }
+
+   private boolean isDateString(String value) {
+      try {
+         // Check if the string matches the expected format "yyyy-MM-dd'T'HH:mm:ss"
+         return value.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
+      } catch (Exception e) {
+         return false;
+      }
+   }
+
+
+
+
+
 
 
 
@@ -638,6 +672,7 @@ public class AlertService {
          update.set("alertStepName", StepName);
          update.set("alertStepId", stepId);
          update.set("status", Status);
+         update.set("lastStepUpdatedDate" , LocalDateTime.now().toString());
          update.set("lastUpdateDate", LocalDateTime.now().toString());
 
 
@@ -658,6 +693,7 @@ public class AlertService {
          rdbmsAlert.setAlertStepId(String.valueOf(stepId));
          rdbmsAlert.setAlertStepName(StepName);
          rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
+         rdbmsAlert.setLastStepUpdatedDate(LocalDateTime.now());
 //         rdbmsAlert.setDueDate(LocalDateTime.now()+10);
 
 

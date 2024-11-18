@@ -48,9 +48,7 @@ public class Alert {
     private String alertStepName;
     private Boolean isCaseCreated;
     private String details;
-    private Map<String, Object> reasonDetails;
-    private Map<String, Object> customFields;
-    private Map<String, Object> workflowInfo;
+
 
     // Additional fields
     private String pivot;
@@ -64,6 +62,20 @@ public class Alert {
     private String representativeId;
     private String buildingBlock;
     private String watchListId;
+    private String representativeName;
+    private String lastStepUpdatedDate;  // Keep as String for MongoDB
+    private String dueIn;
+    private String deadLine;             // Keep as String for MongoDB
+    private String orgKey;
+    private String branchName;
+    private String customerName;
+    private String accountName;
+
+
+    private Map<String, Object> reasonDetails;
+    private Map<String, Object> customFields;
+    private Map<String, Object> workflowInfo;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -323,6 +323,17 @@ public class AlertRepository {
         return collectionName.toLowerCase();
     }
 
+//    public void deleteById(String id) {
+//    }
+
+
+    public AlertEntity deleteById(String alertId) {
+        String collectionName = CaisAlertConstants.ALERTS;
+        Query query = new Query(Criteria.where("alertId").is(alertId));
+        AlertEntity alertEntity = mongoTemplate
+                .findAndRemove(query, AlertEntity.class, collectionName);
+        return alertEntity;
+    }
 //    private String extractCollectionName(String alertType) {
 //        String collectionName = CaisAlertConstants.OTHER;
 //        if (CaisAlertConstants.validAlertTypes.contains(alertType.toLowerCase())) {

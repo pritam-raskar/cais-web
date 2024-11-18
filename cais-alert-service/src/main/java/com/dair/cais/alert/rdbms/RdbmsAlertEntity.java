@@ -138,6 +138,32 @@ public class RdbmsAlertEntity {
     @Column(name = "watch_list_id")
     private String watchListId;
 
+    @Column(name = "representative_name")
+    private String representativeName;
+
+    @Column(name = "due_in")
+    private String dueIn;
+
+    @Column(name = "org_key")
+    private String orgKey;
+
+    @Column(name = "branch_name")
+    private String branchName;
+
+    @Column(name = "customer_name")
+    private String customerName;
+
+    @Column(name = "account_name")
+    private String accountName;
+
+    @Column(name = "last_step_updated_date")
+    private LocalDateTime lastStepUpdatedDate;
+
+    @Column(name = "deadline")
+    private LocalDateTime deadLine;
+
+
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -145,4 +171,6 @@ public class RdbmsAlertEntity {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+
 }

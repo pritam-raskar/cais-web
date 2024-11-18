@@ -18,7 +18,11 @@ import com.dair.cais.steps.StepStatusRepository;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +37,8 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,6 +47,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class AlertService {
+
+   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
    private final AlertMapper alertMapper;
    private final RdbmsAlertMapper rdbmsAlertMapper;
    private final StepRepository stepsRepository;
@@ -59,6 +68,91 @@ public class AlertService {
 
 
    // Base Operations
+   @Transactional
+   public Alert createAlert(Alert alert) {
+      log.debug("Starting synchronized alert creation for alertId: {}", alert.getAlertId());
+
+      List<String> validationErrors = validateAlert(alert);
+      if (!validationErrors.isEmpty()) {
+         log.error("Validation failed for alert: {}", alert.getAlertId());
+         throw new AlertValidationException("Alert validation failed", validationErrors);
+      }
+
+      try {
+         // Set timestamps with proper formatting
+         LocalDateTime now = LocalDateTime.now();
+         String formattedDateTime = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+
+         alert.setCreateDate(formattedDateTime);
+         alert.setLastUpdateDate(formattedDateTime);
+         alert.setCreatedAt(now);
+         alert.setUpdatedAt(now);
+
+         // Format dates in reasonDetails and customFields if they exist
+         if (alert.getReasonDetails() != null) {
+            formatDatesInMap(alert.getReasonDetails());
+         }
+         if (alert.getCustomFields() != null) {
+            formatDatesInMap(alert.getCustomFields());
+         }
+
+         // Create in MongoDB
+         AlertEntity mongoEntity = alertMapper.toEntity(alert);
+         AlertEntity savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
+
+         // Create in RDBMS
+         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(alert);
+         rdbmsAlertRepository.save(rdbmsEntity);
+
+         log.debug("Successfully created alert in both databases for alertId: {}", alert.getAlertId());
+         return alertMapper.toModel(savedMongoEntity);
+
+      } catch (Exception e) {
+         log.error("Failed to create alert: {}", alert.getAlertId(), e);
+         throw new AlertCreationException("Failed to create alert in databases", e);
+      }
+   }
+
+   @SuppressWarnings("unchecked")
+   private void formatDatesInMap(Map<String, Object> map) {
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+         Object value = entry.getValue();
+         if (value instanceof LocalDateTime) {
+            entry.setValue(((LocalDateTime) value).format(formatter));
+         } else if (value instanceof Map) {
+            formatDatesInMap((Map<String, Object>) value);
+         } else if (value instanceof List) {
+            formatDatesInList((List<Object>) value, formatter);
+         }
+      }
+   }
+
+   @SuppressWarnings("unchecked")
+   private void formatDatesInList(List<Object> list, DateTimeFormatter formatter) {
+      for (int i = 0; i < list.size(); i++) {
+         Object item = list.get(i);
+         if (item instanceof LocalDateTime) {
+            list.set(i, ((LocalDateTime) item).format(formatter));
+         } else if (item instanceof Map) {
+            formatDatesInMap((Map<String, Object>) item);
+         } else if (item instanceof List) {
+            formatDatesInList((List<Object>) item, formatter);
+         }
+      }
+   }
+
+
+
+
+
+
+
+
+
+
+
    public List<Alert> getAllActiveAlerts() {
       log.debug("Fetching all active and non-deleted alerts");
       List<AlertEntity> activeAlertEntities = alertRepository.findAllActiveAndNonDeletedAlerts();
@@ -808,6 +902,7 @@ public class AlertService {
               auditLogRequest.getNewValue());
    }
 
+
    @Transactional
    public List<Alert> createAlerts(List<Alert> alerts) {
       log.debug("Starting synchronized creation of {} alerts", alerts.size());
@@ -846,36 +941,36 @@ public class AlertService {
       return createdAlerts;
    }
 
-   @Transactional
-   public Alert createAlert(Alert alert) {
-      log.debug("Starting synchronized alert creation for alertId: {}", alert.getAlertId());
-      List<String> validationErrors = validateAlert(alert);
-      if (!validationErrors.isEmpty()) {
-         log.error("Validation failed for alert: {}", alert.getAlertId());
-         throw new AlertValidationException("Alert validation failed", validationErrors);
-      }
-
-      try {
-         // Create in MongoDB
-         LocalDateTime now = LocalDateTime.now();
-         alert.setCreateDate(String.valueOf(now));
-         alert.setLastUpdateDate(String.valueOf(now));
-         alert.setCreatedAt(now);
-         alert.setUpdatedAt(now);
-         AlertEntity mongoEntity = alertMapper.toEntity(alert);
-         AlertEntity savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
-
-         // Create in RDBMS
-         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(alert);
-         rdbmsAlertRepository.save(rdbmsEntity);
-
-         log.debug("Successfully created alert in both databases for alertId: {}", alert.getAlertId());
-         return alertMapper.toModel(savedMongoEntity);
-      } catch (Exception e) {
-         log.error("Failed to create alert: {}", alert.getAlertId(), e);
-         throw new RuntimeException("Failed to create alert in databases", e);
-      }
-   }
+//   @Transactional
+//   public Alert createAlert(Alert alert) {
+//      log.debug("Starting synchronized alert creation for alertId: {}", alert.getAlertId());
+//      List<String> validationErrors = validateAlert(alert);
+//      if (!validationErrors.isEmpty()) {
+//         log.error("Validation failed for alert: {}", alert.getAlertId());
+//         throw new AlertValidationException("Alert validation failed", validationErrors);
+//      }
+//
+//      try {
+//         // Create in MongoDB
+//         LocalDateTime now = LocalDateTime.now();
+//         alert.setCreateDate(String.valueOf(now));
+//         alert.setLastUpdateDate(String.valueOf(now));
+//         alert.setCreatedAt(now);
+//         alert.setUpdatedAt(now);
+//         AlertEntity mongoEntity = alertMapper.toEntity(alert);
+//         AlertEntity savedMongoEntity = alertRepository.createUpsertAlert(mongoEntity);
+//
+//         // Create in RDBMS
+//         RdbmsAlertEntity rdbmsEntity = rdbmsAlertMapper.toRdbmsEntity(alert);
+//         rdbmsAlertRepository.save(rdbmsEntity);
+//
+//         log.debug("Successfully created alert in both databases for alertId: {}", alert.getAlertId());
+//         return alertMapper.toModel(savedMongoEntity);
+//      } catch (Exception e) {
+//         log.error("Failed to create alert: {}", alert.getAlertId(), e);
+//         throw new RuntimeException("Failed to create alert in databases", e);
+//      }
+//   }
 
    @Transactional
    public Alert createAlertWithAudit(Alert alert, AuditLogRequest auditLogRequest) {

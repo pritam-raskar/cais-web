@@ -43,6 +43,7 @@ com/dair/cais/hierarchy/HierarchyMapper.class
 com/dair/cais/attachment/AttachmentRepository.class
 com/dair/cais/reports/dto/DatabaseSchemaDto.class
 com/dair/cais/reports/dto/VisualFormatDto.class
+com/dair/cais/note/NoteServiceWithAudit.class
 com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingController.class
 com/dair/cais/reports/exception/InvalidReportStateException.class
 com/dair/cais/type/AlertTypeMapperExtended$1.class
@@ -142,11 +143,13 @@ com/dair/cais/access/entity/SystemEntityRepository.class
 com/dair/cais/access/PolicyEntityMapping/PolicyEntityMappingController.class
 com/dair/cais/connection/metadata/ConnectionMetadataMapper.class
 com/dair/cais/access/PolicyAlertMapping/PolicyAlertTypeActionMappingEntity.class
+com/dair/cais/alert/filter/FilterRule.class
 com/dair/cais/access/UserBasedPermission/PermissionWrapper.class
 com/dair/cais/steps/Step.class
 com/dair/cais/reports/dto/FormattingConfigDto$FormattingConfigDtoBuilder.class
 com/dair/cais/type/AlertTypeMapper.class
 com/dair/cais/access/UserBasedPermission/UserPermissionService.class
+com/dair/cais/alert/exception/AlertCreationException.class
 com/dair/cais/access/userOrgRole/UserOrgRoleMappingEntity.class
 com/dair/cais/access/entity/SystemEntityController.class
 com/dair/cais/alert/rdbms/RdbmsAlertMapper.class
@@ -181,6 +184,7 @@ com/dair/cais/reports/dto/ReportQueryRequestDto.class
 com/dair/cais/reports/repository/ReportsRepository.class
 com/dair/cais/enrichment/EnrichAlertDataController.class
 com/dair/cais/type/AlertTypeServiceExtended.class
+com/dair/cais/note/AddNoteToMultipleAlertsRequest.class
 com/dair/cais/access/Role/Role.class
 com/dair/cais/access/reports/Report.class
 com/dair/cais/exception/RoleDeleteException.class
@@ -191,6 +195,7 @@ com/dair/cais/reports/exception/ReportCreationException.class
 com/dair/cais/reports/ReportDesignerController.class
 com/dair/cais/reports/dto/DateRange.class
 com/dair/cais/access/RolePolicyMapping/RolesPolicyMappingRepository.class
+com/dair/cais/alert/filter/FilterCriteria.class
 com/dair/cais/logging/LogResponse.class
 com/dair/cais/reports/service/ReportExecutionService.class
 com/dair/cais/type/AlertTypeController$3.class
@@ -198,6 +203,7 @@ com/dair/cais/logging/LogResponse$LogResponseBuilder.class
 com/dair/cais/fileattachement/FileAttachmentService.class
 com/dair/cais/alert/reason/AlertTransitionReasonController.class
 com/dair/cais/access/RolePolicyMapping/RolesPolicyMappingController$RolePolicyRequest.class
+com/dair/cais/alert/AlertService$1.class
 com/dair/cais/reports/dto/FormattingConfigDto$DataFormatDto$DataFormatDtoBuilder.class
 com/dair/cais/access/user/StringPrefixedSequenceIdGenerator.class
 com/dair/cais/access/alertType/alertTypeMapper1.class
@@ -206,7 +212,6 @@ com/dair/cais/communication/CommunicationMapper.class
 com/dair/cais/reports/dto/ReportColumnDto.class
 com/dair/cais/organization/OrganizationUnitRepository.class
 com/dair/cais/audit/AuditLogRequest.class
-com/dair/cais/alert/AlertValidationException.class
 com/dair/cais/filter/repository/UserFilterRepository.class
 com/dair/cais/filter/service/UserFilterService.class
 com/dair/cais/reports/BaseEntity.class
@@ -230,6 +235,8 @@ com/dair/cais/alert/checklist/AlertStepChecklistService.class
 com/dair/cais/type/AlertTypeController.class
 com/dair/cais/note/NoteMapper.class
 com/dair/cais/reports/controller/ReportExecutionController.class
+com/dair/cais/alert/exception/AlertValidationException.class
+com/dair/cais/note/AddNoteWithAuditRequest.class
 com/dair/cais/connection/Connection.class
 com/dair/cais/hierarchy/Hierarchy.class
 com/dair/cais/reports/dto/FormattingConfigDto$VisualFormatDto.class
@@ -244,6 +251,7 @@ com/dair/cais/connector/Connector.class
 com/dair/cais/reports/constant/ReportConstants.class
 com/dair/cais/common/config/CaisAlertConstants.class
 com/dair/cais/access/organizationUnit/OrgUnitEntity.class
+com/dair/cais/alert/exception/AlertOperationException.class
 com/dair/cais/filter/event/FilterEventListener.class
 com/dair/cais/reports/dto/ConditionalFormatDto.class
 com/dair/cais/reports/exception/ReportRetrievalException.class
@@ -348,6 +356,7 @@ com/dair/cais/access/entity/SystemEntity.class
 com/dair/cais/access/Actions/ActionRepository.class
 com/dair/cais/reports/ReportDesignerService$5.class
 com/dair/cais/audit/AuditTrailController.class
+com/dair/cais/alert/filter/MongoQueryBuilder.class
 com/dair/cais/access/PolicyEntityMapping/PolicyEntityMappingMapper.class
 com/dair/cais/reports/dto/ColumnMetadataDto.class
 com/dair/cais/connection/ConnectionEntity.class
@@ -365,6 +374,7 @@ com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingRepository.cla
 com/dair/cais/organization/OrgKeyPair.class
 com/dair/cais/type/AlertTypeExtended.class
 com/dair/cais/alert/AlertRepository$1.class
+com/dair/cais/alert/filter/AlertFilterRequest.class
 com/dair/cais/note/Note.class
 com/dair/cais/communication/CommunicationController.class
 com/dair/cais/reports/ReportDesignerService$2.class
@@ -384,6 +394,7 @@ com/dair/cais/fileattachement/StorageService.class
 com/dair/cais/audit/AuditTrailMapper.class
 com/dair/cais/enrichment/QueryExecutionRequest.class
 com/dair/cais/attachment/AttachmentMapperExtended.class
+com/dair/cais/note/AlertNoteController$1.class
 com/dair/cais/note/NoteEntityExtended.class
 com/dair/cais/organization/OrganizationFamilyService.class
 com/dair/cais/filter/dto/FilterConfigDto.class

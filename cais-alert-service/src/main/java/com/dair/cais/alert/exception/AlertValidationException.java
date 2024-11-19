@@ -1,4 +1,4 @@
-package com.dair.cais.alert;
+package com.dair.cais.alert.exception;
 
 import java.util.List;
 

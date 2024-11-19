@@ -1,5 +1,9 @@
 package com.dair.cais.alert;
 
+import com.dair.cais.alert.exception.AlertOperationException;
+import com.dair.cais.alert.exception.AlertValidationException;
+import com.dair.cais.alert.filter.AlertFilterRequest;
+import com.dair.cais.alert.filter.FilterCriteria;
 import com.dair.cais.audit.AuditLogRequest;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,15 +44,29 @@ public class AlertController {
         return ResponseEntity.ok(alertService.getAllActiveAlertsWithAudit(auditLogRequest));
     }
 
-        @GetMapping("/alertbyloggedinUser/{userId}")  // Changed to POST since we're using request body
-    @Operation(summary = "Get alerts from orgFamily for logged in user")
+    @GetMapping("/alertbyloggedinUser/{userId}")
+    @Operation(summary = "Get filtered alerts for logged in user",
+            description = "Retrieves alerts from orgFamily for logged in user with additional filtering capabilities")
     public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyBYUserOrgUnits(
             @PathVariable String userId,
-            @RequestBody AuditLogRequest auditLogRequest) {
+            @RequestBody AlertFilterRequest request) {
 
-        log.debug("Received request to find alerts for user: {} with audit request: {}", userId, auditLogRequest);
-        List<AlertEntity> alerts = alertService.findAlertsByOrgFamilyByUserOrgKeysWithAudit(userId, auditLogRequest);
-        return ResponseEntity.ok().body(alerts);
+        log.debug("Received request to find alerts for user: {} with filters: {} and audit request: {}",
+                userId, request.getFilterCriteria(), request.getAuditLogRequest());
+
+        try {
+            List<AlertEntity> alerts = alertService.findAlertsByOrgFamilyByUserOrgKeysWithAudit(
+                    userId,
+                    request.getFilterCriteria(),
+                    request.getAuditLogRequest());
+
+            log.debug("Found {} alerts matching criteria for user: {}", alerts.size(), userId);
+            return ResponseEntity.ok().body(alerts);
+
+        } catch (Exception e) {
+            log.error("Error processing alert request for user: {}", userId, e);
+            throw new AlertOperationException("Failed to retrieve alerts", e);
+        }
     }
 
 
@@ -222,7 +241,7 @@ public class AlertController {
         return ResponseEntity.ok(alertService.changeStep(alertId, stepId));
     }
 
-    @PatchMapping("/audit/changestep/{alertId}")
+    @PatchMapping(value = "/audit/changestep/{alertId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Change alert step with audit")
     public ResponseEntity<Alert> changeStepWithAudit(
             @PathVariable String alertId,

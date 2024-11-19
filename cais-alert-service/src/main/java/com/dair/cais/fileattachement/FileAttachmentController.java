@@ -71,6 +71,19 @@ public class FileAttachmentController {
         return new ResponseEntity<>(attachments, HttpStatus.OK);
     }
 
+    @PostMapping("/uploadMultipleFiles-audit")
+    public ResponseEntity<List<FileAttachment>> uploadMultipleFiles(@RequestParam("files") List<MultipartFile> files,
+                                                                    @RequestParam("alertId") String alertId,
+                                                                    @RequestParam("createdBy") String createdBy,
+                                                                    @RequestParam("comment") String comment,
+                                                                    @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+        List<FileAttachment> attachments = attachmentServiceWithAudit.uploadMultipleAttachmentsWithAudit(files, alertId, createdBy, comment, auditLogRequest);
+        return new ResponseEntity<>(attachments, HttpStatus.OK);
+    }
+
+
     @PostMapping(value = "/upload-multi-alerts-audit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, FileAttachment>> uploadAttachmentForMultipleAlertsWithAudit(
             @RequestParam("file") MultipartFile file,
@@ -80,7 +93,15 @@ public class FileAttachmentController {
             @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
 
         ObjectMapper objectMapper = new ObjectMapper();
+        // Add debug logging
+        System.out.println("Received auditLogRequest: " + auditLogRequestJson);
+
         AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+        // Validate auditLogRequest
+        if (auditLogRequest.getUserId() == null) {
+            throw new IllegalArgumentException("userId cannot be null");
+        }
 
         Map<String, FileAttachment> result = attachmentServiceWithAudit.uploadAttachmentForMultipleAlertsWithAudit(
                 file, alertIds, createdBy, comment, auditLogRequest);
@@ -97,7 +118,15 @@ public class FileAttachmentController {
             @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
 
         ObjectMapper objectMapper = new ObjectMapper();
+        // Add debug logging
+        System.out.println("Received auditLogRequest: " + auditLogRequestJson);
+
         AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+        // Validate auditLogRequest
+        if (auditLogRequest.getUserId() == null) {
+            throw new IllegalArgumentException("userId cannot be null");
+        }
 
         Map<String, List<FileAttachment>> result = attachmentServiceWithAudit.uploadMultipleAttachmentsForMultipleAlertsWithAudit(
                 files, alertIds, createdBy, comment, auditLogRequest);
@@ -105,17 +134,6 @@ public class FileAttachmentController {
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
-    @PostMapping("/uploadMultipleFiles-audit")
-    public ResponseEntity<List<FileAttachment>> uploadMultipleFiles(@RequestParam("files") List<MultipartFile> files,
-                                                                    @RequestParam("alertId") String alertId,
-                                                                    @RequestParam("createdBy") String createdBy,
-                                                                    @RequestParam("comment") String comment,
-                                                                    @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
-        List<FileAttachment> attachments = attachmentServiceWithAudit.uploadMultipleAttachmentsWithAudit(files, alertId, createdBy, comment, auditLogRequest);
-        return new ResponseEntity<>(attachments, HttpStatus.OK);
-    }
 
 
     @GetMapping("/alert/{alertId}")

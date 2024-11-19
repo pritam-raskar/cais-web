@@ -1,5 +1,6 @@
 package com.dair.cais.exception;
 
+import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -76,4 +77,24 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(body);
     }
+
+    @ExceptionHandler(AlertOperationException.class)
+    public ResponseEntity<Object> handleAlertOperationException(
+            AlertOperationException ex,
+            WebRequest request) {
+
+        log.error("Alert operation failed", ex);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Alert Operation Error");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(body);
+    }
+
 }

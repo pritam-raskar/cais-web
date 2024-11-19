@@ -3,6 +3,11 @@ package com.dair.cais.alert;
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
 import com.dair.cais.access.user.UserEntity;
 import com.dair.cais.access.user.UserRepository;
+import com.dair.cais.alert.exception.AlertCreationException;
+import com.dair.cais.alert.exception.AlertOperationException;
+import com.dair.cais.alert.exception.AlertValidationException;
+import com.dair.cais.alert.filter.FilterCriteria;
+import com.dair.cais.alert.filter.MongoQueryBuilder;
 import com.dair.cais.alert.rdbms.RdbmsAlertEntity;
 import com.dair.cais.alert.rdbms.RdbmsAlertMapper;
 import com.dair.cais.alert.rdbms.RdbmsAlertRepository;
@@ -22,16 +27,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperationContext;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -58,8 +69,7 @@ public class AlertService {
    private final ObjectMapper objectMapper;
    private final UserRepository userRepository;
    private final OrganizationFamilyRepository orgFamilyRepository;
-
-
+   private final MongoQueryBuilder mongoQueryBuilder;
 
 
 
@@ -293,22 +303,82 @@ public class AlertService {
       return alertRepository.findAlertsByOrgFamilyBYUserOrgKeys(userOrgKeys);
    }
 
-   public List<AlertEntity> findAlertsByOrgFamilyByUserOrgKeysWithAudit(String userId, AuditLogRequest auditLogRequest) {
-      List<AlertEntity> alerts = findAlertsByOrgFamilyByUserOrgKeys(userId);
+   @Transactional
+   public List<AlertEntity> findAlertsByOrgFamilyByUserOrgKeysWithAudit(
+           String userId,
+           FilterCriteria filterCriteria,
+           AuditLogRequest auditLogRequest) {
 
-      auditLogRequest.setAffectedItemType("Alert");
-      auditLogRequest.setDescription("Fetched alerts for user's org units");
-      auditTrailService.logAction(auditLogRequest.getUserId(),
-              auditLogRequest.getUserRole(),
-              auditLogRequest.getActionId(),
-              auditLogRequest.getDescription(),
-              auditLogRequest.getCategory(),
-              auditLogRequest.getAffectedItemType(),
-              null,
-              null,
-              "Found " + alerts.size() + " alerts for user " + userId);
+      log.debug("Finding filtered alerts for user: {} with criteria: {}", userId, filterCriteria);
 
-      return alerts;
+      try {
+         List<String> userOrgKeys = userPermissionService.getDistinctOrgKeysForUser(userId);
+         if (userOrgKeys.isEmpty()) {
+            log.warn("No organization keys found for user: {}", userId);
+            return Collections.emptyList();
+         }
+
+         // Create base criteria for org family matching
+         Criteria orgCriteria = new Criteria().orOperator(
+                 Criteria.where("orgFamilyTokens").in(userOrgKeys),
+                 Criteria.where("orgFamily").in(userOrgKeys)
+         );
+
+         // Add active and non-deleted criteria
+         Criteria baseCriteria = new Criteria().andOperator(
+                 Criteria.where("isDeleted").is(false),
+                 Criteria.where("isActive").is(true),
+                 orgCriteria
+         );
+
+         // Combine with user filters if provided
+         Criteria finalCriteria = filterCriteria != null ?
+                 new Criteria().andOperator(baseCriteria, mongoQueryBuilder.buildCriteria(filterCriteria)) :
+                 baseCriteria;
+
+         // Build and execute the aggregation
+         Aggregation aggregation = Aggregation.newAggregation(
+                 new AggregationOperation() {
+                    @Override
+                    public Document toDocument(AggregationOperationContext context) {
+                       return new Document("$addFields",
+                               new Document("orgFamilyTokens",
+                                       new Document("$split", Arrays.asList("$orgFamily", ":"))
+                               )
+                       );
+                    }
+                 },
+                 Aggregation.match(finalCriteria)
+         );
+
+         AggregationResults<AlertEntity> results = mongoTemplate.aggregate(
+                 aggregation,
+                 CaisAlertConstants.ALERTS,
+                 AlertEntity.class
+         );
+
+         List<AlertEntity> alerts = results.getMappedResults();
+
+         // Create audit log in the same transaction
+         auditTrailService.logAction(
+                 auditLogRequest.getUserId(),
+                 auditLogRequest.getUserRole(),
+                 auditLogRequest.getActionId(),
+                 "Retrieved filtered alerts for user",
+                 auditLogRequest.getCategory(),
+                 "Alert",
+                 null,
+                 null,
+                 String.format("Found %d alerts for user %s", alerts.size(), userId)
+         );
+
+         log.debug("Successfully retrieved {} alerts for user: {}", alerts.size(), userId);
+         return alerts;
+
+      } catch (Exception e) {
+         log.error("Error retrieving filtered alerts for user: {}", userId, e);
+         throw new AlertOperationException("Failed to retrieve filtered alerts", e);
+      }
    }
 
    @Transactional

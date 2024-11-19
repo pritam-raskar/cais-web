@@ -1,13 +1,18 @@
 package com.dair.cais.note;
 
+import com.dair.cais.audit.AuditLogRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import javax.validation.Valid;
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +23,7 @@ import java.util.Map;
  */
 
 @RestController
-@RequestMapping("/alerts/{alertId}/notes")
+@RequestMapping("/alerts/notes")
 @Tag(name = "alert notes")
 
 public class AlertNoteController {
@@ -26,6 +31,82 @@ public class AlertNoteController {
    @Autowired
    private NoteService noteService;
 
+   @Autowired
+   private NoteServiceWithAudit noteServiceWithAudit;
+
+
+   @PostMapping(value = "/addnote-audit/{alertId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+   @Operation(summary = "Add a note with audit logging")
+   public ResponseEntity<NoteExtended> addNoteWithAudit(
+           @RequestParam("note") String note,
+           @PathVariable String alertId,
+           @RequestParam("createdBy") String createdBy,
+           @RequestParam("entity") String entity,
+           @RequestParam("entityValue") String entityValue,
+           @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+
+      ObjectMapper objectMapper = new ObjectMapper();
+      AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+      // Validate audit request
+      if (auditLogRequest.getUserId() == null) {
+         throw new IllegalArgumentException("userId cannot be null");
+      }
+
+      NoteExtended createdNote = noteServiceWithAudit.addNoteWithAudit(
+              note,
+              alertId,
+              createdBy,
+              entity,
+              entityValue,
+              auditLogRequest
+      );
+
+      return ResponseEntity.ok().body(createdNote);
+   }
+
+   @PostMapping(value = "/addnote-multi-alerts-audit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+   @Operation(summary = "Add a note to multiple alerts with audit logging")
+   public ResponseEntity<Map<String, NoteExtended>> addNoteToMultipleAlertsWithAudit(
+           @RequestParam("note") String note,
+           @RequestParam("alertIds") String alertIdsJson,
+           @RequestParam("createdBy") String createdBy,
+           @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+
+      ObjectMapper objectMapper = new ObjectMapper();
+      List<String> alertIds = objectMapper.readValue(alertIdsJson, new TypeReference<List<String>>() {});
+      AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+      // Validate audit request
+      if (auditLogRequest.getUserId() == null) {
+         throw new IllegalArgumentException("userId cannot be null");
+      }
+
+      // Note that we're not using entity and entityValue from parameters anymore
+      Map<String, NoteExtended> results = noteServiceWithAudit.addNoteToMultipleAlertsWithAudit(
+              note,
+              alertIds,
+              createdBy,
+              "Alert",  // Hardcoded as "Alert"
+              null,     // This will be set to alertId for each note
+              auditLogRequest
+      );
+
+      return ResponseEntity.ok().body(results);
+   }
+
+   @GetMapping("/getNotes-audit")
+   @Operation(summary = "Fetch all notes for an alert with audit logging")
+   public ResponseEntity<List<NoteExtended>> fetchNotesWithAudit(
+           @PathVariable String alertId,
+           @RequestParam("auditLogRequest") String auditLogRequestJson) throws IOException {
+
+      ObjectMapper objectMapper = new ObjectMapper();
+      AuditLogRequest auditLogRequest = objectMapper.readValue(auditLogRequestJson, AuditLogRequest.class);
+
+      List<NoteExtended> notes = noteServiceWithAudit.getNotesWithAudit(alertId, auditLogRequest);
+      return ResponseEntity.ok().body(notes);
+   }
 
 
 

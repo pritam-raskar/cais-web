@@ -35,21 +35,34 @@ public class AuditTrailService {
     }
 
     public List<AuditTrail> getAuditTrailByUser(Long userId, ZonedDateTime start, ZonedDateTime end) {
-        List<AuditTrailEntity> entities = auditTrailRepository.findByUserIdAndActionTimestampBetween(userId, start, end);
-        return auditTrailMapper.entitiesToDtos(entities);
+        List<AuditTrailDetailsDTO> results = auditTrailRepository.findByUserIdAndActionTimestampBetween(userId, start, end);
+        return results.stream()
+                .map(dto -> {
+                    AuditTrail auditTrail = auditTrailMapper.entityToDto(dto.getAuditTrail());
+                    auditTrail.setActionName(dto.getActionName());
+                    auditTrail.setUserName(dto.getUserName());
+                    return auditTrail;
+                })
+                .collect(Collectors.toList());
     }
 
     public List<AuditTrail> getAuditTrailByItem(String itemType, String itemId) {
-        List<AuditTrailEntity> entities = auditTrailRepository.findByAffectedItemTypeAndAffectedItemId(itemType, itemId);
-        return auditTrailMapper.entitiesToDtos(entities);
+        List<AuditTrailDetailsDTO> results = auditTrailRepository.findByAffectedItemTypeAndAffectedItemId(itemType, itemId);
+        return results.stream()
+                .map(dto -> {
+                    AuditTrail auditTrail = auditTrailMapper.entityToDto(dto.getAuditTrail());
+                    auditTrail.setActionName(dto.getActionName());
+                    auditTrail.setUserName(dto.getUserName());
+                    return auditTrail;
+                })
+                .collect(Collectors.toList());
     }
 
-    public List<String> getAuditTrailStepHistory( String itemId, Integer actionId) {
-        List<AuditTrailEntity> entities = auditTrailRepository.findAuditTrailStepHistory( itemId , actionId);
-        List<String> newValues = entities.stream()
-                .map(AuditTrailEntity::getNewValue)
+    public List<String> getAuditTrailStepHistory(String itemId, Integer actionId) {
+        List<AuditTrailDetailsDTO> results = auditTrailRepository.findAuditTrailStepHistory(itemId, actionId);
+        return results.stream()
+                .map(dto -> dto.getAuditTrail().getNewValue())
                 .collect(Collectors.toList());
-        return newValues;
     }
 
     @Transactional

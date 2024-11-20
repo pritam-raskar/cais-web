@@ -58,4 +58,32 @@ public class AuditTrailMapper {
                 .map(this::entityToDto)
                 .collect(Collectors.toList());
     }
+
+    public AuditTrail mapFromEntityAndDetails(Object[] data) {
+        AuditTrailEntity entity = (AuditTrailEntity) data[0];
+        String actionName = (String) data[1];
+        String userName = (String) data[2];
+
+        AuditTrail dto = new AuditTrail();
+        dto.setAuditId(entity.getAuditId());
+        dto.setActionId(entity.getAction() != null ? entity.getAction().getActionId() : null);
+        dto.setActionName(actionName);
+        dto.setUserId(entity.getUserId());
+        dto.setUserRole(entity.getUserRole());
+        dto.setUserName(userName);
+        dto.setActionTimestamp(entity.getActionTimestamp());
+        dto.setDescription(entity.getDescription());
+        dto.setCategory(entity.getCategory());
+        dto.setAffectedItemType(entity.getAffectedItemType());
+        dto.setAffectedItemId(entity.getAffectedItemId());
+        dto.setOldValue(entity.getOldValue());
+        dto.setNewValue(entity.getNewValue());
+        return dto;
+    }
+
+    public List<AuditTrail> mapFromEntityAndDetailsList(List<Object[]> dataList) {
+        return dataList.stream()
+                .map(this::mapFromEntityAndDetails)
+                .collect(Collectors.toList());
+    }
 }

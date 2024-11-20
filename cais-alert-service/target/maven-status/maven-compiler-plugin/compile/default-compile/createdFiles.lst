@@ -1,6 +1,7 @@
 com/dair/cais/reports/constant/ReportConstants$Status.class
 com/dair/cais/note/NoteEntity.class
 com/dair/cais/attachment/AlertAttachmentController.class
+com/dair/cais/audit/AuditTrailDetailsDTO.class
 com/dair/cais/access/userorgrolemapping/UserOrgRoleMappingRequest.class
 com/dair/cais/reports/ReportsEntity.class
 com/dair/cais/access/permission/AsyncConfig.class

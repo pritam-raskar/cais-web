@@ -95,7 +95,7 @@ public class AlertNoteController {
       return ResponseEntity.ok().body(results);
    }
 
-   @GetMapping("/getNotes-audit")
+   @GetMapping("/getNotes-audit/{alertId}")
    @Operation(summary = "Fetch all notes for an alert with audit logging")
    public ResponseEntity<List<NoteExtended>> fetchNotesWithAudit(
            @PathVariable String alertId,
@@ -123,12 +123,12 @@ public class AlertNoteController {
       return ResponseEntity.ok().body(createdNote);
    }
 
-   @GetMapping("/getNotes")
+   @GetMapping("/getnotes/{alertId}")
    @Operation(summary = "Fetch all notes for an alert")
    public ResponseEntity<List<NoteExtended>> fetchNotes(
            @PathVariable String alertId) {
       List<NoteExtended> listOfNotes = noteService.fetchNotes(alertId);
-      return  ResponseEntity.ok().body(listOfNotes);
+      return ResponseEntity.ok().body(listOfNotes);
    }
 
 

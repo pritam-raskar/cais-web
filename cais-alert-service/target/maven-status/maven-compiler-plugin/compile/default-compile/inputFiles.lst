@@ -10,6 +10,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/permission/AsyncConfig.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/dto/QueryRuleDto.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/policy/PolicyController.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/audit/AuditTrailDetailsDTO.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/constant/ReportConstants.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/modules/ModuleController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/connection/Connection.java

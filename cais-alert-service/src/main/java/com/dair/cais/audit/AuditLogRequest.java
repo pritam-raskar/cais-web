@@ -22,8 +22,8 @@ public class AuditLogRequest {
     private String oldValue;
     private String newValue;
 
-    public AuditLogRequest(AuditLogRequest auditLogRequest) {
-    }
+//    public AuditLogRequest(AuditLogRequest auditLogRequest) {
+//    }
 
     // Getters and setters
     public Long getUserId() { return userId; }
@@ -52,4 +52,16 @@ public class AuditLogRequest {
 
     public String getNewValue() { return newValue; }
     public void setNewValue(String newValue) { this.newValue = newValue; }
+
+    public AuditLogRequest(AuditLogRequest source) {
+        this.userId = source.getUserId();
+        this.userRole = source.getUserRole();
+        this.actionId = source.getActionId();
+        this.description = source.getDescription();
+        this.category = source.getCategory();
+        this.affectedItemType = source.getAffectedItemType();
+        this.affectedItemId = source.getAffectedItemId();
+        this.oldValue = source.getOldValue();
+        this.newValue = source.getNewValue();
+    }
 }

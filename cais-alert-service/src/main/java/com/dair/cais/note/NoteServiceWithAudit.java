@@ -38,7 +38,7 @@ public class NoteServiceWithAudit {
         // Log the audit
         auditLogRequest.setAffectedItemType("Alert");
         auditLogRequest.setAffectedItemId(alertId);
-        //auditLogRequest.setNewValue(note); // Store the note content as the new value
+//        auditLogRequest.setNewValue(note); // Store the note content as the new value
         auditTrailService.logAction(
                 auditLogRequest.getUserId(),
                 auditLogRequest.getUserRole(),

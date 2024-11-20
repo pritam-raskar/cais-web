@@ -44,7 +44,7 @@ public class AlertController {
         return ResponseEntity.ok(alertService.getAllActiveAlertsWithAudit(auditLogRequest));
     }
 
-    @GetMapping("/alertbyloggedinUser/{userId}")
+    @PostMapping("/alertbyloggedinUser/{userId}")
     @Operation(summary = "Get filtered alerts for logged in user",
             description = "Retrieves alerts from orgFamily for logged in user with additional filtering capabilities")
     public ResponseEntity<List<AlertEntity>> findAlertsByOrgFamilyBYUserOrgUnits(

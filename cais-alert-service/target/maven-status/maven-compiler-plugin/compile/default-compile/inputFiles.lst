@@ -144,6 +144,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/filter/MongoQueryBuilder.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/alert/checklist/AlertStepChecklistController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/note/NoteService.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/user/UserDetailDTO.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyModuleMapping/PolicyModuleMappingService.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/userorgrolemapping/UserOrgRoleMappingRequest.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/exception/ApiError.java

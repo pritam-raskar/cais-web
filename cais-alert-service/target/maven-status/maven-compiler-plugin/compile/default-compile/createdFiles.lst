@@ -20,6 +20,7 @@ com/dair/cais/alert/rdbms/RdbmsAlertRepository.class
 com/dair/cais/filter/dto/UserFilterCreateDto.class
 com/dair/cais/audit/AuditTrail.class
 com/dair/cais/organization/OrganizationUnitEntity.class
+com/dair/cais/access/user/UserDetailDTO$UserDetailDTOBuilder.class
 com/dair/cais/access/entity/SystemEntityJpa.class
 com/dair/cais/alert/AlertRepository.class
 com/dair/cais/access/UserBasedPermission/Metadata.class
@@ -107,6 +108,7 @@ com/dair/cais/access/user/UserStatusUpdateRequest.class
 com/dair/cais/reports/mapper/ReportSummaryMapper.class
 com/dair/cais/access/user/JwtService$TokenValidationResult.class
 com/dair/cais/reports/dto/ReportUpdateDto.class
+com/dair/cais/access/user/UserDetailDTO.class
 com/dair/cais/alert/checklist/AlertStepChecklistController.class
 com/dair/cais/fileattachement/CmAttachmentRepository.class
 com/dair/cais/connection/EncryptedData.class

@@ -1,7 +1,7 @@
 package com.dair.cais.access.user;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -108,5 +108,19 @@ public class AuthenticationService {
         }
 
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public UserDetailDTO getUserDetails(String userId) {
+        log.debug("Fetching user details for userId: {}", userId);
+
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.error("User not found with ID: {}", userId);
+                    throw new ResourceNotFoundException("User not found with ID: " + userId);
+                });
+
+        log.debug("Successfully fetched user details for userId: {}", userId);
+        return UserDetailDTO.fromEntity(user);
     }
 }

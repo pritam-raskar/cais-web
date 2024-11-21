@@ -67,6 +67,9 @@ public class AlertMapper {
         alert.setBranchName(entity.getBranchName());
         alert.setCustomerName(entity.getCustomerName());
         alert.setAccountName(entity.getAccountName());
+        alert.setScenarioModelIds(entity.getScenarioModelIds());
+        alert.setScenarioModelNames(entity.getScenarioModelNames());
+        alert.setAlertTypeName(entity.getAlertTypeName());
 
         // Audit timestamps
         alert.setCreatedAt(entity.getCreatedAt());
@@ -143,6 +146,9 @@ public class AlertMapper {
         alertEntity.setBranchName(alert.getBranchName());
         alertEntity.setCustomerName(alert.getCustomerName());
         alertEntity.setAccountName(alert.getAccountName());
+        alertEntity.setScenarioModelIds(alert.getScenarioModelIds());
+        alertEntity.setScenarioModelNames(alert.getScenarioModelNames());
+        alertEntity.setAlertTypeName(alert.getAlertTypeName());
 
         // Audit timestamps
         if (alert.getCreatedAt() != null) {

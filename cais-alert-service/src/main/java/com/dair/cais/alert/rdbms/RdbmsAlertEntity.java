@@ -156,6 +156,15 @@ public class RdbmsAlertEntity {
     @Column(name = "account_name")
     private String accountName;
 
+    @Column(name = "scenario_model_ids")
+    private String scenarioModelIds;
+
+    @Column(name = "scenario_model_names")
+    private String scenarioModelNames;
+
+    @Column(name = "alert_type_name")
+    private String alertTypeName;
+
     @Column(name = "last_step_updated_date")
     private LocalDateTime lastStepUpdatedDate;
 

@@ -70,6 +70,9 @@ public class Alert {
     private String branchName;
     private String customerName;
     private String accountName;
+    private String scenarioModelIds;
+    private String scenarioModelNames;
+    private String alertTypeName;
 
 
     private Map<String, Object> reasonDetails;

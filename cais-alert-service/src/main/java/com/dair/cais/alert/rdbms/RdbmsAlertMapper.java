@@ -94,6 +94,9 @@ public class RdbmsAlertMapper {
             entity.setOrgKey(alert.getOrgKey());
             entity.setBranchName(alert.getBranchName());
             entity.setCustomerName(alert.getCustomerName());
+            entity.setScenarioModelIds(alert.getScenarioModelIds());
+            entity.setScenarioModelNames(alert.getScenarioModelNames());
+            entity.setAlertTypeName(alert.getAlertTypeName());
             entity.setAccountName(alert.getAccountName());
 
             // Audit fields

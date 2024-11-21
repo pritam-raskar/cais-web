@@ -68,6 +68,9 @@ public class AlertEntity implements Serializable {
     private String orgKey;
     private String branchName;
     private String customerName;
+    private String scenarioModelIds;
+    private String scenarioModelNames;
+    private String alertTypeName;
     private String accountName;
 
     private Map<String, Object> reasonDetails;

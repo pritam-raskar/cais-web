@@ -62,6 +62,7 @@ public class RdbmsAlertMapper {
             entity.setHasMultipleScenario(alert.getHasMultipleScenario());
             entity.setIsDeleted(alert.getIsDeleted());
             entity.setOrgUnitId(alert.getOrgUnitId());
+            entity.setOrgKey(alert.getOrgUnitKey());
             entity.setOrgFamily(alert.getOrgFamily());
             entity.setPreviousOrgUnitId(alert.getPreviousOrgUnitId());
             entity.setIsOrgUnitUpdated(alert.getIsOrgUnitUpdated());

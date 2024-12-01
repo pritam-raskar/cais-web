@@ -30,6 +30,7 @@ public class AlertMapper {
         alert.setHasMultipleScenario(entity.getHasMultipleScenario());
         alert.setIsDeleted(entity.getIsDeleted());
         alert.setOrgUnitId(entity.getOrgUnitId());
+        alert.setOrgUnitKey(entity.getOrgUnitKey());
         alert.setOrgFamily(entity.getOrgFamily());
         alert.setPreviousOrgUnitId(entity.getPreviousOrgUnitId());
         alert.setIsOrgUnitUpdated(entity.getIsOrgUnitUpdated());
@@ -109,6 +110,7 @@ public class AlertMapper {
         alertEntity.setHasMultipleScenario(alert.getHasMultipleScenario());
         alertEntity.setIsDeleted(alert.getIsDeleted());
         alertEntity.setOrgUnitId(alert.getOrgUnitId());
+        alertEntity.setOrgUnitKey(alert.getOrgUnitKey());
         alertEntity.setOrgFamily(alert.getOrgFamily());
         alertEntity.setPreviousOrgUnitId(alert.getPreviousOrgUnitId());
         alertEntity.setIsOrgUnitUpdated(alert.getIsOrgUnitUpdated());

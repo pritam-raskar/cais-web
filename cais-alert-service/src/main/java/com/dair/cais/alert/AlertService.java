@@ -923,6 +923,7 @@ public class AlertService {
                        entity.setHasMultipleScenario(alert.getHasMultipleScenario());
                     if (alert.getIsDeleted() != null) entity.setIsDeleted(alert.getIsDeleted());
                     if (alert.getOrgUnitId() != null) entity.setOrgUnitId(alert.getOrgUnitId());
+                    if (alert.getOrgUnitKey() != null) entity.setOrgKey(alert.getOrgUnitKey());
                     if (alert.getOrgFamily() != null) entity.setOrgFamily(alert.getOrgFamily());
                     if (alert.getPreviousOrgUnitId() != null) entity.setPreviousOrgUnitId(alert.getPreviousOrgUnitId());
                     if (alert.getIsOrgUnitUpdated() != null) entity.setIsOrgUnitUpdated(alert.getIsOrgUnitUpdated());

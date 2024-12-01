@@ -34,6 +34,7 @@ public class AlertEntity implements Serializable {
     private Boolean hasMultipleScenario;
     private Boolean isDeleted;
     private String orgUnitId;
+    private String orgUnitKey;
     private String orgFamily;
     private String previousOrgUnitId;
     private Boolean isOrgUnitUpdated;

@@ -175,6 +175,7 @@ com/dair/cais/note/AlertNoteController.class
 com/dair/cais/reports/dto/SchemaStatisticsDto.class
 com/dair/cais/access/userorgrolemapping/UserOrgRoleMappingRequest$OrgRoleMapping.class
 com/dair/cais/access/user/LoginResponseDto.class
+com/dair/cais/alert/migration/AlertMigrationController.class
 com/dair/cais/fileattachement/FileAttachment.class
 com/dair/cais/reports/enums/enums$ReportStatus.class
 com/dair/cais/access/PolicyModuleMapping/PolicyModuleMappingController.class
@@ -285,6 +286,7 @@ com/dair/cais/common/config/CustomCacheable.class
 com/dair/cais/reports/ReportsMapper$1.class
 com/dair/cais/reports/ReportsMapper.class
 com/dair/cais/access/policy/PolicyInUseException.class
+com/dair/cais/alert/migration/AlertDataMigrationService.class
 com/dair/cais/access/policy/PolicyController.class
 com/dair/cais/filter/service/FilterQueryBuilderService.class
 com/dair/cais/hierarchy/HierarchyController.class

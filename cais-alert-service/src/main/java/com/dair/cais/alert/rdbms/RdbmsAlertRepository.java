@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -20,4 +21,7 @@ public interface RdbmsAlertRepository extends JpaRepository<RdbmsAlertEntity, Lo
                              @Param("ownerId") String ownerId,
                              @Param("ownerName") String ownerName,
                              @Param("lastUpdateDate") LocalDateTime lastUpdateDate);
+
+    @Query("SELECT r FROM RdbmsAlertEntity r WHERE r.orgKey IS NULL")
+    List<RdbmsAlertEntity> findAllByOrgKeyIsNull();
 }

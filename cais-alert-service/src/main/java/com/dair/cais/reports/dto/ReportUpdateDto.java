@@ -23,4 +23,6 @@ public class ReportUpdateDto {
     private Integer maxRows;
     private List<ReportColumnUpdateDto> columns;
     private List<ReportParameterDto> parameters;  // Add this field
+
+    private Boolean isTab;
 }

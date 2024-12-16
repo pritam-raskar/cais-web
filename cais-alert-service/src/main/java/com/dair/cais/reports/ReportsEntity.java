@@ -42,6 +42,10 @@ public class ReportsEntity {
     @Column(name = "is_published")
     private Boolean isPublished = false;
 
+    @Column(name = "is_tab")
+    @Comment("Flag indicating if the report is displayed as a tab")
+    private Boolean isTab = false;
+
     @Column(name = "table_view_name", length = 255, nullable = false)
     private String tableViewName;
 
@@ -87,6 +91,7 @@ public class ReportsEntity {
         if (cacheDuration == null) cacheDuration = 0;
         if (maxRows == null) maxRows = 1000;
         if (isPublished == null) isPublished = false;
+        if (isTab == null) isTab = false;
     }
 
     @PreUpdate

@@ -68,6 +68,14 @@ public class ReportDesignerService {
         }
     }
 
+    /**
+     * Creates a new report with the provided configuration
+     *
+     * @param createDto DTO containing the report configuration
+     * @return Created report details
+     * @throws DuplicateReportIdentifierException if report identifier already exists
+     * @throws ReportCreationException if report creation fails
+     */
     @Transactional
     public ReportDto createReport(ReportCreateDto createDto) {
         log.info("Creating new report with identifier: {}", createDto.getReportIdentifier());
@@ -91,8 +99,10 @@ public class ReportDesignerService {
             report.setReportType(createDto.getReportType() != null ? createDto.getReportType() : "TABLE");
             report.setCacheDuration(createDto.getCacheDuration() != null ? createDto.getCacheDuration() : 0);
             report.setMaxRows(createDto.getMaxRows() != null ? createDto.getMaxRows() : 1000);
+            report.setIsTab(createDto.getIsTab() != null ? createDto.getIsTab() : false);
             report.setStatus("DRAFT");
             report.setIsPublished(false);
+            report.setIsTab(createDto.getIsTab());
             report.setCreatedAt(ZonedDateTime.now());
             report.setUpdatedAt(ZonedDateTime.now());
 
@@ -164,6 +174,9 @@ public class ReportDesignerService {
             }
             if (updateDto.getMaxRows() != null) {
                 report.setMaxRows(updateDto.getMaxRows());
+            }
+            if (updateDto.getIsTab() != null) {
+                report.setIsTab(updateDto.getIsTab());
             }
             report.setUpdatedAt(ZonedDateTime.now());
 
@@ -334,6 +347,7 @@ public class ReportDesignerService {
         dto.setCacheDuration(report.getCacheDuration());
         dto.setMaxRows(report.getMaxRows());
         dto.setIsPublished(report.getIsPublished());
+        dto.setIsTab(report.getIsTab());
         dto.setCreatedBy(report.getCreatedBy());
         dto.setCreatedAt(report.getCreatedAt());
         dto.setUpdatedBy(report.getUpdatedBy());

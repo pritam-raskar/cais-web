@@ -15,8 +15,10 @@ public class ReportSummaryDto {
     private String reportType;
     private String status;
     private Boolean isPublished;
+    private Boolean isTab;
     private String createdBy;
     private java.time.ZonedDateTime createdAt;
     private String updatedBy;
     private java.time.ZonedDateTime updatedAt;
+
 }

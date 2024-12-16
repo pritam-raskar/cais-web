@@ -40,4 +40,6 @@ public class ReportCreateDto {
     public List<ReportParameterDto> getParameters() {
         return parameters;
     }
+
+    private Boolean isTab;
 }

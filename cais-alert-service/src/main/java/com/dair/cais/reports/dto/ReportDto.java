@@ -1,6 +1,7 @@
 package com.dair.cais.reports.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
@@ -19,6 +20,8 @@ public class ReportDto extends BaseAuditDto {
     private Integer cacheDuration;
     private Integer maxRows;
     private Boolean isPublished;
+    private Boolean isTab;
     private List<ReportColumnDto> columns;
     private List<ReportParameterDto> parameters;  // Add this field
+
 }

@@ -69,4 +69,12 @@ public interface ReportsRepository extends JpaRepository<ReportsEntity, Integer>
 
     @Query("SELECT r FROM ReportsEntity r ORDER BY r.updatedAt DESC")
     List<ReportsEntity> findAllReportsBasicInfo();
+
+    /**
+     * Finds all reports that are marked as tabs
+     *
+     * @return List of reports that are tabs
+     */
+    @Query("SELECT r FROM ReportsEntity r WHERE r.isTab = true ORDER BY r.reportName")
+    List<ReportsEntity> findByIsTabTrue();
 }

@@ -90,6 +90,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/ReportMetadataService.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyEntityMapping/PolicyEntityMappingEntity.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/userorgrolemapping/UserOrgRoleMappingService.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/UserBasedPermission/AlertTypeOrgPermissionsNew.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/communication/Communication.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/service/ReportExecutionService.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyAlertMapping/PolicyAlertTypeActionMapping.java
@@ -174,6 +175,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/user/AuthenticationController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/user/UserRepository.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/steps/StepStatusRepository.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/UserBasedPermission/ActionFormat.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/user/StringPrefixedSequenceIdGenerator.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/organization/OrganizationFamily.java
@@ -368,6 +370,7 @@
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/filter/dto/UserFilterUpdateDto.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/organization/OrganizationFamilyEntity.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/PolicyAlertMapping/PolicyAlertTypeActionMappingController.java
+/Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/access/UserBasedPermission/OrgActionsNew.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/type/AlertTypeController.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/reports/dto/FormattingConfigDto.java
 /Users/pritam/Desktop/Data/Dair/git-projects/ot/cais-web/cais-alert-service/src/main/java/com/dair/cais/cachemanagement/CacheManagementController.java

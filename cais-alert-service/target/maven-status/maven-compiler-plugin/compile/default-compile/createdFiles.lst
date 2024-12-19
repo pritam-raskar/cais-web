@@ -110,6 +110,7 @@ com/dair/cais/type/AlertTypeEntityExtended.class
 com/dair/cais/access/policy/PolicyEntity.class
 com/dair/cais/access/user/UserStatusUpdateRequest.class
 com/dair/cais/reports/mapper/ReportSummaryMapper.class
+com/dair/cais/access/UserBasedPermission/OrgActionsNew.class
 com/dair/cais/access/user/JwtService$TokenValidationResult.class
 com/dair/cais/reports/dto/ReportUpdateDto.class
 com/dair/cais/access/user/UserDetailDTO.class
@@ -175,6 +176,7 @@ com/dair/cais/filter/service/SourceIdentifierService.class
 com/dair/cais/alert/checklist/AlertStepChecklist.class
 com/dair/cais/attachment/AttachmentMapper.class
 com/dair/cais/connector/ConnectorRepository.class
+com/dair/cais/access/UserBasedPermission/ActionFormat.class
 com/dair/cais/connection/ConnectionService.class
 com/dair/cais/reports/dto/SchemaSearchCriteria.class
 com/dair/cais/note/AlertNoteController.class
@@ -387,6 +389,7 @@ com/dair/cais/access/modules/ModuleEntity.class
 com/dair/cais/reports/tabs/service/TabService.class
 com/dair/cais/access/PolicyReportMapping/PolicyReportActionMappingRepository.class
 com/dair/cais/organization/OrgKeyPair.class
+com/dair/cais/access/UserBasedPermission/AlertTypeOrgPermissionsNew.class
 com/dair/cais/type/AlertTypeExtended.class
 com/dair/cais/alert/AlertRepository$1.class
 com/dair/cais/alert/filter/AlertFilterRequest.class

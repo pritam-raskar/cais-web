@@ -96,59 +96,11 @@ public class UserPermissionService {
         return userPermissionDto;
     }
 
-    private void processUserPermissions(
-            String userId,
-            PermissionWrapper permissionWrapper,
-            Set<String> uniqueAlertTypesOrgId,
-            Set<String> uniqueOrgId,
-            Set<String> distinctOrgKeys) {
-
-        // Initialize maps to store permissions
-        Map<String, AlertTypeOrgPermissions> alertTypePermissions = new HashMap<>();
-        Map<String, Map<String, List<ActionCondition>>> generalPermissions = new HashMap<>();
-
-        List<UserOrgRoleMappingEntity> userOrgRoleMappings =
-                userOrgRoleMappingRepository.findByUserUserId(userId);
-
-        for (UserOrgRoleMappingEntity uorm : userOrgRoleMappings) {
-            String orgId = uorm.getOrgUnit().getOrgId().toString();
-            Integer roleId = uorm.getRole().getRoleId();
-
-            uniqueOrgId.add(orgId);
-
-            // Get org key
-            OrganizationUnitEntity orgUnit = organizationUnitRepository.findById(Integer.parseInt(orgId))
-                    .orElseThrow(() -> new RuntimeException("Organization unit not found for ID: " + orgId));
-            distinctOrgKeys.add(orgUnit.getOrgKey());
-
-            processRolePermissions(roleId, orgId, generalPermissions, alertTypePermissions,
-                    uniqueAlertTypesOrgId);
-        }
-
-        // Set permissions in wrapper
-        permissionWrapper.setPermissionsByType("alert-types", alertTypePermissions);
-
-        // Set general permissions
-        if (generalPermissions.containsKey("modules")) {
-            permissionWrapper.setPermissionsByType("modules", generalPermissions.get("modules"));
-        }
-        if (generalPermissions.containsKey("reports")) {
-            permissionWrapper.setPermissionsByType("reports", generalPermissions.get("reports"));
-        }
-
-        // Handle any additional entity types
-        generalPermissions.forEach((type, permissions) -> {
-            if (!type.equals("modules") && !type.equals("reports")) {
-                permissionWrapper.setPermissionsByType(type, permissions);
-            }
-        });
-    }
-
     private void processRolePermissions(
             Integer roleId,
             String orgId,
             Map<String, Map<String, List<ActionCondition>>> generalPermissions,
-            Map<String, AlertTypeOrgPermissions> alertTypePermissions,
+            Map<String, Map<String, OrgActionsNew>> alertTypePermissions,
             Set<String> uniqueAlertTypesOrgId) {
 
         List<RolesPolicyMappingEntity> rolePolicyMappings =
@@ -173,19 +125,26 @@ public class UserPermissionService {
             PolicyEntityMappingEntity pem,
             String orgId,
             Map<String, Map<String, List<ActionCondition>>> generalPermissions,
-            Map<String, AlertTypeOrgPermissions> orgBasedPermissions,
+            Map<String, Map<String, OrgActionsNew>> alertTypePermissions,
             Set<String> uniqueAlertTypesOrgId) {
 
-        String entityType = pem.getEntityType().toLowerCase();
+        try {
+            String entityType = pem.getEntityType().toLowerCase();
+            log.debug("Processing entity permission for type: {}, id: {}", entityType, pem.getEntityId());
 
-        if ("alert-types".equals(entityType)) {
-            processOrgBasedPermission(pem, orgId, orgBasedPermissions, uniqueAlertTypesOrgId);
-        } else {
-            processGeneralPermission(pem, entityType, generalPermissions);
+            if ("alert-types".equals(entityType)) {
+                processOrgBasedPermission(pem, orgId, alertTypePermissions, uniqueAlertTypesOrgId);
+            } else {
+                processGeneralPermission(pem, entityType, generalPermissions);
+            }
+        } catch (Exception e) {
+            log.error("Error processing entity permission for entity type: {}, id: {}: {}",
+                    pem.getEntityType(), pem.getEntityId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process entity permission", e);
         }
     }
 
-    private void processOrgBasedPermission(
+    private void processOrgBasedPermission_OLD(
             PolicyEntityMappingEntity pem,
             String orgId,
             Map<String, AlertTypeOrgPermissions> orgBasedPermissions,
@@ -224,44 +183,179 @@ public class UserPermissionService {
             String entityType,
             Map<String, Map<String, List<ActionCondition>>> generalPermissions) {
 
-        if ("modules".equals(entityType)) {
+        try {
+            if ("modules".equals(entityType)) {
+                processModulePermission(pem, generalPermissions);
+            } else {
+                processOtherEntityPermission(pem, entityType, generalPermissions);
+            }
+        } catch (Exception e) {
+            log.error("Error processing general permission for entity type: {}, id: {}: {}",
+                    entityType, pem.getEntityId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process general permission", e);
+        }
+    }
+
+    private void processModulePermission(
+            PolicyEntityMappingEntity pem,
+            Map<String, Map<String, List<ActionCondition>>> generalPermissions) {
+
+        try {
             // Get module from repository using entityId
             Optional<ModuleEntity> moduleOpt = moduleRepository.findById(Integer.parseInt(pem.getEntityId()));
             if (moduleOpt.isPresent()) {
-                String moduleName = moduleOpt.get().getModuleName();
-                Map<String, List<ActionCondition>> entityTypePermissions = generalPermissions.computeIfAbsent(
-                        entityType, k -> new HashMap<>());
+                ModuleEntity module = moduleOpt.get();
+                String moduleName = module.getModuleName();
 
-                List<ActionCondition> actions = entityTypePermissions.computeIfAbsent(
-                        moduleName, k -> new ArrayList<>());
+                Map<String, List<ActionCondition>> modulePermissions = generalPermissions
+                        .computeIfAbsent("modules", k -> new HashMap<>());
+
+                List<ActionCondition> actions = modulePermissions
+                        .computeIfAbsent(moduleName, k -> new ArrayList<>());
 
                 ActionCondition actionCondition = new ActionCondition(
                         pem.getAction().getActionName(),
-                        pem.getCondition() != null ? pem.getCondition() : "N/A"
+                        pem.getCondition() != null ? pem.getCondition() : ""
                 );
 
                 if (!actions.contains(actionCondition)) {
                     actions.add(actionCondition);
                 }
-            }
-        } else {
-            // Original logic for other entity types
-            String entityId = pem.getEntityId();
-            Map<String, List<ActionCondition>> entityTypePermissions = generalPermissions.computeIfAbsent(
-                    entityType, k -> new HashMap<>());
 
-            List<ActionCondition> actions = entityTypePermissions.computeIfAbsent(
-                    entityId, k -> new ArrayList<>());
+                log.debug("Successfully processed module permission for module: {}", moduleName);
+            } else {
+                log.warn("Module not found for ID: {}", pem.getEntityId());
+            }
+        } catch (NumberFormatException e) {
+            log.error("Invalid module ID format: {}", pem.getEntityId(), e);
+            throw new RuntimeException("Invalid module ID format", e);
+        } catch (Exception e) {
+            log.error("Error processing module permission for module ID: {}: {}",
+                    pem.getEntityId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process module permission", e);
+        }
+    }
+
+    private void processOtherEntityPermission(
+            PolicyEntityMappingEntity pem,
+            String entityType,
+            Map<String, Map<String, List<ActionCondition>>> generalPermissions) {
+
+        try {
+            String entityId = pem.getEntityId();
+            Map<String, List<ActionCondition>> entityTypePermissions = generalPermissions
+                    .computeIfAbsent(entityType, k -> new HashMap<>());
+
+            List<ActionCondition> actions = entityTypePermissions
+                    .computeIfAbsent(entityId, k -> new ArrayList<>());
 
             ActionCondition actionCondition = new ActionCondition(
                     pem.getAction().getActionName(),
-                    pem.getCondition() != null ? pem.getCondition() : "N/A"
+                    pem.getCondition() != null ? pem.getCondition() : ""
             );
 
             if (!actions.contains(actionCondition)) {
                 actions.add(actionCondition);
             }
+
+            log.debug("Successfully processed entity permission for type: {}, id: {}",
+                    entityType, entityId);
+        } catch (Exception e) {
+            log.error("Error processing entity permission for type: {}, id: {}: {}",
+                    entityType, pem.getEntityId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process entity permission", e);
         }
+    }
+
+    private void processOrgBasedPermission(
+            PolicyEntityMappingEntity pem,
+            String orgId,
+            Map<String, Map<String, OrgActionsNew>> alertTypePermissions,
+            Set<String> uniqueAlertTypesOrgId) {
+
+        try {
+            String entityId = pem.getEntityId();
+            Map<String, OrgActionsNew> orgMap = alertTypePermissions.computeIfAbsent(entityId, k -> new HashMap<>());
+
+            OrgActionsNew orgActions = orgMap.computeIfAbsent(orgId, k -> {
+                OrgActionsNew actions = new OrgActionsNew();
+                actions.setActions(new HashMap<>());
+                return actions;
+            });
+
+            ActionFormat actionFormat = new ActionFormat();
+            actionFormat.setCondition(pem.getCondition() != null ? pem.getCondition() : "");
+
+            orgActions.getActions().put(pem.getAction().getActionName(), actionFormat);
+            uniqueAlertTypesOrgId.add(entityId + ":" + orgId);
+
+            log.debug("Successfully processed org-based permission for entity: {}, orgId: {}",
+                    entityId, orgId);
+        } catch (Exception e) {
+            log.error("Error processing org-based permission for entity: {}, orgId: {}: {}",
+                    pem.getEntityId(), orgId, e.getMessage(), e);
+            throw new RuntimeException("Failed to process org-based permission", e);
+        }
+    }
+
+    // Update the method signature in processUserPermissions
+    private void processUserPermissions(
+            String userId,
+            PermissionWrapper permissionWrapper,
+            Set<String> uniqueAlertTypesOrgId,
+            Set<String> uniqueOrgId,
+            Set<String> distinctOrgKeys) {
+
+        Map<String, Map<String, OrgActionsNew>> alertTypePermissions = new HashMap<>();
+        Map<String, Map<String, List<ActionCondition>>> generalPermissions = new HashMap<>();
+
+        List<UserOrgRoleMappingEntity> userOrgRoleMappings =
+                userOrgRoleMappingRepository.findByUserUserId(userId);
+
+        for (UserOrgRoleMappingEntity uorm : userOrgRoleMappings) {
+            String orgId = uorm.getOrgUnit().getOrgId().toString();
+            Integer roleId = uorm.getRole().getRoleId();
+
+            uniqueOrgId.add(orgId);
+
+            // Get org key
+            OrganizationUnitEntity orgUnit = organizationUnitRepository.findById(Integer.parseInt(orgId))
+                    .orElseThrow(() -> new RuntimeException("Organization unit not found for ID: " + orgId));
+            distinctOrgKeys.add(orgUnit.getOrgKey());
+
+            processRolePermissions(roleId, orgId, generalPermissions, alertTypePermissions,
+                    uniqueAlertTypesOrgId);
+        }
+
+        // Transform and set alert type permissions
+        Map<String, AlertTypeOrgPermissionsNew> formattedAlertTypePermissions = transformAlertTypePermissions(alertTypePermissions);
+        permissionWrapper.setPermissionsByType("alert-types", formattedAlertTypePermissions);
+
+        // Set other permissions
+        if (generalPermissions.containsKey("modules")) {
+            permissionWrapper.setModules(generalPermissions.get("modules"));
+        }
+        if (generalPermissions.containsKey("reports")) {
+            permissionWrapper.setReports(generalPermissions.get("reports"));
+        }
+    }
+
+    private Map<String, AlertTypeOrgPermissionsNew> transformAlertTypePermissions(
+            Map<String, Map<String, OrgActionsNew>> alertTypePermissions) {
+        Map<String, AlertTypeOrgPermissionsNew> result = new HashMap<>();
+
+        alertTypePermissions.forEach((alertType, orgMap) -> {
+            AlertTypeOrgPermissionsNew permissions = new AlertTypeOrgPermissionsNew();
+            permissions.setOrgId(new HashMap<>());
+
+            orgMap.forEach((orgId, actions) -> {
+                permissions.getOrgId().put(orgId, actions);
+            });
+
+            result.put(alertType, permissions);
+        });
+
+        return result;
     }
 
     @Transactional

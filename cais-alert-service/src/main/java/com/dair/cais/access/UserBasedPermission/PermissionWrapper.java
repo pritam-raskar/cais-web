@@ -7,24 +7,22 @@ import java.util.HashMap;
 
 @Data
 public class PermissionWrapper {
-    // Keep existing fields for backward compatibility
-    private Map<String, AlertTypeOrgPermissions> alertType;
+    private Map<String, AlertTypeOrgPermissionsNew> alertType;
     private Map<String, List<ActionCondition>> modules;
     private Map<String, List<ActionCondition>> reports;
-
-    // Add new generic map for future entity types
     private Map<String, Object> additionalPermissions;
 
+    @SuppressWarnings("unchecked")
     public void setPermissionsByType(String entityType, Object permissions) {
         switch(entityType.toLowerCase()) {
             case "alert-types":
                 if (permissions instanceof Map) {
-                    this.alertType = (Map<String, AlertTypeOrgPermissions>) permissions;
-                } else if (permissions instanceof AlertTypeOrgPermissions) {
+                    this.alertType = (Map<String, AlertTypeOrgPermissionsNew>) permissions;
+                } else if (permissions instanceof AlertTypeOrgPermissionsNew) {
                     if (this.alertType == null) {
                         this.alertType = new HashMap<>();
                     }
-                    this.alertType.put(entityType, (AlertTypeOrgPermissions) permissions);
+                    this.alertType.put(entityType, (AlertTypeOrgPermissionsNew) permissions);
                 }
                 break;
             case "modules":
@@ -41,20 +39,3 @@ public class PermissionWrapper {
         }
     }
 }
-
-
-
-
-//package com.dair.cais.access.UserBasedPermission;
-//
-//import lombok.Data;
-//
-//import java.util.List;
-//import java.util.Map;
-//
-//@Data
-//class PermissionWrapper {
-//    private Map<String, AlertTypeOrgPermissions> alertType;
-//    private Map<String, List<ActionCondition>> modules;
-//    private Map<String, List<ActionCondition>> reports;
-//}

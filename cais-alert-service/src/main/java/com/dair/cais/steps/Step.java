@@ -10,6 +10,8 @@ import java.time.LocalDateTime;
 @Table(name = "cm_steps", schema = "info_alert")
 public class Step {
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "step_id_seq")
+    @SequenceGenerator(name = "step_id_seq", sequenceName = "info_alert.cm_steps_step_id_seq", allocationSize = 1)
     @Column(name = "step_id")
     private Long stepId;
 

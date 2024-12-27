@@ -2,6 +2,8 @@ package com.dair.cais.exception;
 
 import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
+import com.dair.cais.steps.exception.StepNameAlreadyExistsException;
+import com.dair.cais.steps.exception.StepNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -95,6 +97,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(body);
+    }
+
+    @ExceptionHandler(StepNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleStepNotFoundException(StepNotFoundException ex) {
+        log.error("Step not found: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(StepNameAlreadyExistsException.class)
+    public ResponseEntity<Map<String, String>> handleStepNameAlreadyExistsException(StepNameAlreadyExistsException ex) {
+        log.error("Step name already exists: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 
 }

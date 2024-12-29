@@ -2,17 +2,12 @@ package com.dair.cais.access.policy;
 
 import com.dair.cais.access.PolicyEntityMapping.PolicyEntityMappingRepository;
 import com.dair.cais.access.RolePolicyMapping.RolesPolicyMappingRepository;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,9 +36,28 @@ public class PolicyService {
     }
 
     public Policy getPolicyById(Integer id) {
-        return policyRepository.findById(id)
-                .map(policyMapper::toModel)
-                .orElse(null);
+        log.debug("Fetching policy with ID: {}", id);
+
+        PolicyEntity policyEntity = policyRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Policy not found with ID: {}", id);
+                    return new EntityNotFoundException("Policy not found with ID: " + id);
+                });
+
+        List<AssociatedRole> roleDetails = null;
+        try {
+            roleDetails = rolesPolicyMappingRepository.findRoleDetailsByPolicy(policyEntity);
+            log.debug("Found {} associated roles for policy {}",
+                    roleDetails.size(), id);
+        } catch (Exception e) {
+            log.error("Error fetching associated roles for policy {}: {}",
+                    id, e.getMessage());
+        }
+
+        Policy policy = policyMapper.toDto(policyEntity, roleDetails);
+        log.debug("Successfully fetched policy: {}", policy);
+
+        return policy;
     }
 
     public Policy createPolicy(Policy policy) {

@@ -1,5 +1,6 @@
 package com.dair.cais.access.RolePolicyMapping;
 
+import com.dair.cais.access.policy.AssociatedRole;
 import com.dair.cais.access.policy.PolicyEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -60,12 +61,22 @@ public interface RolesPolicyMappingRepository extends JpaRepository<RolesPolicyM
             @Param("roleId") Integer roleId,
             @Param("policyId") Integer policyId);
 
+    @Query("SELECT new com.dair.cais.access.policy.AssociatedRole(r.roleId, r.roleName) " +
+            "FROM RoleEntity r " +
+            "JOIN RolesPolicyMappingEntity rpm ON rpm.role = r " +
+            "WHERE rpm.policy = :policy " +
+            "ORDER BY r.roleName ASC")
+    List<AssociatedRole> findRoleDetailsByPolicy(@Param("policy") PolicyEntity policy);
+
     @Query("SELECT DISTINCT r.roleName FROM RoleEntity r " +
             "JOIN RolesPolicyMappingEntity rpm ON rpm.role = r " +
-            "WHERE rpm.policy = :policy")
+            "WHERE rpm.policy = :policy " +
+            "ORDER BY r.roleName ASC")
     List<String> findRoleNamesByPolicy(@Param("policy") PolicyEntity policy);
 
     void deleteByPolicy(PolicyEntity policy);
+
+
 }
 
 

@@ -3,9 +3,12 @@ package com.dair.cais.steps.service.impl;
 import com.dair.cais.steps.Step;
 import com.dair.cais.steps.StepRepository;
 import com.dair.cais.steps.dto.StepDTO;
+import com.dair.cais.steps.exception.StepDeleteException;
 import com.dair.cais.steps.exception.StepNameAlreadyExistsException;
 import com.dair.cais.steps.service.StepService;
 import com.dair.cais.steps.exception.StepNotFoundException;
+import com.dair.cais.workflow.model.WorkflowDetail;
+import com.dair.cais.workflow.repository.WorkflowStepMappingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StepServiceImpl implements StepService {
     private final StepRepository stepRepository;
+    private final WorkflowStepMappingRepository workflowStepMappingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -88,12 +92,32 @@ public class StepServiceImpl implements StepService {
     @Override
     @Transactional
     public void deleteStep(Long id) {
-        log.debug("Deleting step with id: {}", id);
-        if (!stepRepository.existsById(id)) {
-            throw new StepNotFoundException("Step not found with id: " + id);
+        log.debug("Attempting to delete step with ID: {}", id);
+
+        Step step = stepRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Step not found with ID: {}", id);
+                    return new StepNotFoundException("Step not found with ID: " + id);
+                });
+
+        List<WorkflowDetail> associatedWorkflows = workflowStepMappingRepository
+                .findWorkflowDetailsByStepId(id);
+
+        if (!associatedWorkflows.isEmpty()) {
+            String workflowNames = associatedWorkflows.stream()
+                    .map(WorkflowDetail::getWorkflowName)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+
+            log.error("Cannot delete step ID {} as it is used in workflows: {}", id, workflowNames);
+            throw new StepDeleteException(
+                    String.format("Step is being used in workflows: %s", workflowNames),
+                    associatedWorkflows.size()
+            );
         }
-        stepRepository.deleteById(id);
-        log.info("Deleted step with id: {}", id);
+
+        stepRepository.delete(step);
+        log.info("Successfully deleted step with ID: {}", id);
     }
 
     @Override

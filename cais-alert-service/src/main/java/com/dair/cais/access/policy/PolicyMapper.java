@@ -2,6 +2,9 @@ package com.dair.cais.access.policy;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Component
 public class PolicyMapper {
 
@@ -33,5 +36,31 @@ public class PolicyMapper {
         entity.setIsActive(model.getIsActive());
 
         return entity;
+    }
+
+    public Policy toDto(PolicyEntity entity, List<AssociatedRole> roleDetails) {
+        if (entity == null) {
+            return null;
+        }
+
+        Policy dto = new Policy();
+        dto.setPolicyId(entity.getPolicyId());
+        dto.setName(entity.getName());
+        dto.setDescription(entity.getDescription());
+        dto.setIsActive(entity.getIsActive());
+        dto.setType(entity.getType());
+
+        if (roleDetails != null && !roleDetails.isEmpty()) {
+            dto.setAssociatedRoles(roleDetails.stream()
+                    .map(role -> {
+                        AssociatedRole associatedRole = new AssociatedRole();
+                        associatedRole.setRoleId(role.getRoleId());
+                        associatedRole.setRoleName(role.getRoleName());
+                        return associatedRole;
+                    })
+                    .collect(Collectors.toList()));
+        }
+
+        return dto;
     }
 }

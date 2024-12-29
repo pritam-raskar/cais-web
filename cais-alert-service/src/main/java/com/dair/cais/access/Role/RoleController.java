@@ -148,4 +148,14 @@ public class RoleController {
         response.put("error", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
+
+    @GetMapping("/template")
+    @Operation(summary = "Get role template with actions and alert types")
+    @ApiResponse(responseCode = "200", description = "Template retrieved successfully")
+    @ApiResponse(responseCode = "500", description = "Internal server error")
+    public ResponseEntity<Map<String, Object>> getRoleTemplate() {
+        log.debug("GET /roles/template - Fetching role template");
+        Map<String, Object> template = roleService.getRoleTemplate();
+        return ResponseEntity.ok(template);
+    }
 }

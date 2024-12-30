@@ -21,4 +21,5 @@ public class Workflow {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime updatedDate;
     private String updatedBy;
+    private String uiConfig;
 }

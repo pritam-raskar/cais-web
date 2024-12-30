@@ -36,4 +36,18 @@ public class WorkflowEntity {
 
     @Column(name = "updated_by")
     private String updatedBy;
+
+    @Column(name = "ui_config", columnDefinition = "text")
+    private String uiConfig;
+
+    @PrePersist
+    protected void onCreate() {
+        createdDate = LocalDateTime.now();
+        updatedDate = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedDate = LocalDateTime.now();
+    }
 }

@@ -49,3 +49,5 @@ target/
 
 # Compiled files
 **/*.class
+
+**/.DS_Store

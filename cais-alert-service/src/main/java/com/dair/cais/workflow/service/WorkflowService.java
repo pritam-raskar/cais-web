@@ -2,20 +2,20 @@ package com.dair.cais.workflow.service;
 
 import com.dair.cais.workflow.entity.WorkflowEntity;
 import com.dair.cais.workflow.exception.WorkflowAlreadyExistsException;
+import com.dair.cais.workflow.exception.WorkflowUpdateException;
 import com.dair.cais.workflow.mapper.WorkflowMapper;
 import com.dair.cais.workflow.model.Workflow;
 import com.dair.cais.workflow.model.WorkflowDetailDTO;
 import com.dair.cais.workflow.repository.WorkflowRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import jakarta.persistence.EntityNotFoundException;
-
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +28,7 @@ import java.util.Optional;
 public class WorkflowService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowMapper workflowMapper;
-    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<Workflow> getAllWorkflows() {
@@ -50,7 +50,6 @@ public class WorkflowService {
 
         validateWorkflow(workflow);
 
-        // Set creation timestamp if not provided
         if (workflow.getCreatedDate() == null) {
             workflow.setCreatedDate(LocalDateTime.now());
         }
@@ -63,71 +62,28 @@ public class WorkflowService {
         return workflowMapper.toModel(entity);
     }
 
-    /**
-     * Retrieves workflow details from cm_workflow table.
-     *
-     * @param workflowId the workflow ID to fetch details for
-     * @return List of workflow details
-     * @throws EntityNotFoundException if workflow doesn't exist
-     */
     @Transactional(readOnly = true)
     public List<WorkflowDetailDTO> getWorkflowDetails(Long workflowId) {
         log.debug("Fetching workflow details for workflow id: {}", workflowId);
 
-        // First verify the workflow exists
-        if (!workflowRepository.existsById(workflowId)) {
-            log.error("Workflow not found with id: {}", workflowId);
-            throw new EntityNotFoundException("Workflow not found with id: " + workflowId);
-        }
-
-        String sql = """
-            SELECT workflow_id,
-                   workflow_name,
-                   description,
-                   created_by,
-                   created_date,
-                   updated_date,
-                   updated_by
-            FROM info_alert.cm_workflow
-            WHERE workflow_id = ?
-        """;
-
-        try {
-            List<WorkflowDetailDTO> details = jdbcTemplate.query(
-                    sql,
-                    (rs, rowNum) -> {
-                        WorkflowDetailDTO dto = new WorkflowDetailDTO();
-                        dto.setWorkflowId(rs.getLong("workflow_id"));
-                        dto.setWorkflowName(rs.getString("workflow_name"));
-                        dto.setDescription(rs.getString("description"));
-                        dto.setCreatedBy(rs.getString("created_by"));
-                        dto.setCreatedDate(rs.getTimestamp("created_date") != null ?
-                                rs.getTimestamp("created_date").toLocalDateTime() : null);
-                        dto.setUpdatedDate(rs.getTimestamp("updated_date") != null ?
-                                rs.getTimestamp("updated_date").toLocalDateTime() : null);
-                        dto.setUpdatedBy(rs.getString("updated_by"));
-                        return dto;
-                    },
-                    workflowId
-            );
-
-            log.debug("Found {} workflow details for workflow id: {}", details.size(), workflowId);
-            return details;
-
-        } catch (DataAccessException e) {
-            log.error("Error fetching workflow details for workflow id: {}", workflowId, e);
-            throw new RuntimeException("Failed to fetch workflow details: " + e.getMessage(), e);
-        }
+        return workflowRepository.findById(workflowId)
+                .map(entity -> {
+                    WorkflowDetailDTO dto = new WorkflowDetailDTO();
+                    dto.setWorkflowId(entity.getWorkflowId());
+                    dto.setWorkflowName(entity.getWorkflowName());
+                    dto.setDescription(entity.getDescription());
+                    dto.setCreatedBy(entity.getCreatedBy());
+                    dto.setCreatedDate(entity.getCreatedDate());
+                    dto.setUpdatedDate(entity.getUpdatedDate());
+                    dto.setUpdatedBy(entity.getUpdatedBy());
+                    return Collections.singletonList(dto);
+                })
+                .orElseThrow(() -> {
+                    log.error("Workflow not found with id: {}", workflowId);
+                    return new EntityNotFoundException("Workflow not found with id: " + workflowId);
+                });
     }
 
-    /**
-     * Updates an existing workflow.
-     *
-     * @param workflowId ID of the workflow to update
-     * @param workflow Updated workflow data
-     * @return Updated workflow
-     * @throws EntityNotFoundException if workflow not found
-     */
     @Transactional
     public Workflow updateWorkflow(Long workflowId, Workflow workflow) {
         log.debug("Updating workflow with id: {} with data: {}", workflowId, workflow);
@@ -138,7 +94,6 @@ public class WorkflowService {
                     return new EntityNotFoundException("Workflow not found with id: " + workflowId);
                 });
 
-        // Check if new name conflicts with existing workflow (excluding current workflow)
         if (!existingEntity.getWorkflowName().equals(workflow.getWorkflowName()) &&
                 workflowRepository.existsByWorkflowName(workflow.getWorkflowName())) {
             log.warn("Cannot update workflow. Name '{}' already exists", workflow.getWorkflowName());
@@ -148,19 +103,13 @@ public class WorkflowService {
         }
 
         WorkflowEntity updatedEntity = workflowMapper.toEntity(workflow);
-        updatedEntity.setWorkflowId(workflowId); // Ensure ID is preserved
+        updatedEntity.setWorkflowId(workflowId);
         updatedEntity = workflowRepository.save(updatedEntity);
 
         log.info("Successfully updated workflow with id: {}", workflowId);
         return workflowMapper.toModel(updatedEntity);
     }
 
-    /**
-     * Deletes a workflow by ID.
-     *
-     * @param workflowId ID of the workflow to delete
-     * @throws EntityNotFoundException if workflow not found
-     */
     @Transactional
     public void deleteWorkflow(Long workflowId) {
         log.debug("Deleting workflow with id: {}", workflowId);
@@ -174,12 +123,69 @@ public class WorkflowService {
         log.info("Successfully deleted workflow with id: {}", workflowId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean workflowExists(Long workflowId) {
+        boolean exists = workflowRepository.existsById(workflowId);
+        log.debug("Checking if workflow exists with id {}: {}", workflowId, exists);
+        return exists;
+    }
+
+    @Transactional(readOnly = true)
+    public long getWorkflowCount() {
+        long count = workflowRepository.count();
+        log.debug("Retrieved total workflow count: {}", count);
+        return count;
+    }
+
+    @Transactional(readOnly = true)
+    public String getWorkflowUiConfig(Long workflowId) {
+        log.debug("Fetching UI configuration for workflow with id: {}", workflowId);
+
+        return workflowRepository.findById(workflowId)
+                .map(entity -> {
+                    String uiConfig = entity.getUiConfig();
+                    return uiConfig != null ? uiConfig : "{}";
+                })
+                .orElseThrow(() -> {
+                    log.error("Workflow not found with id: {}", workflowId);
+                    return new EntityNotFoundException("Workflow not found with id: " + workflowId);
+                });
+    }
+
     /**
-     * Validates workflow data before creation or update.
+     * Updates the UI configuration for a workflow.
      *
-     * @param workflow Workflow to validate
-     * @throws IllegalArgumentException if validation fails
+     * @param workflowId ID of the workflow to update
+     * @param uiConfig New UI configuration as text
+     * @return Updated workflow
+     * @throws EntityNotFoundException if workflow not found
+     * @throws WorkflowUpdateException if update fails
      */
+    @Transactional
+    public Workflow updateWorkflowUiConfig(Long workflowId, String uiConfig) {
+        log.debug("Updating UI configuration for workflow with id: {}", workflowId);
+
+        try {
+            WorkflowEntity existingEntity = workflowRepository.findById(workflowId)
+                    .orElseThrow(() -> new EntityNotFoundException("Workflow not found with id: " + workflowId));
+
+            existingEntity.setUiConfig(uiConfig);
+            existingEntity.setUpdatedDate(LocalDateTime.now());
+
+            WorkflowEntity updatedEntity = workflowRepository.save(existingEntity);
+            log.info("Successfully updated UI configuration for workflow with id: {}", workflowId);
+
+            return workflowMapper.toModel(updatedEntity);
+
+        } catch (EntityNotFoundException e) {
+            log.error("Workflow not found with id: {}", workflowId);
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to update UI configuration for workflow with id: {}", workflowId, e);
+            throw new WorkflowUpdateException("Failed to update workflow UI configuration", e);
+        }
+    }
+
     private void validateWorkflow(Workflow workflow) {
         log.debug("Validating workflow data: {}", workflow);
 
@@ -195,31 +201,42 @@ public class WorkflowService {
             throw new IllegalArgumentException("Created by cannot be null or empty");
         }
 
+        if (workflow.getUiConfig() != null) {
+            try {
+                JsonNode jsonNode = objectMapper.readTree(workflow.getUiConfig());
+                validateUiConfigStructure(jsonNode);
+            } catch (Exception e) {
+                log.error("Invalid UI configuration format: {}", e.getMessage());
+                throw new IllegalArgumentException("Invalid UI configuration format: " + e.getMessage());
+            }
+        }
+
         log.debug("Workflow validation successful");
     }
 
-    /**
-     * Checks if a workflow exists by ID.
-     *
-     * @param workflowId ID to check
-     * @return true if workflow exists, false otherwise
-     */
-    @Transactional(readOnly = true)
-    public boolean workflowExists(Long workflowId) {
-        boolean exists = workflowRepository.existsById(workflowId);
-        log.debug("Checking if workflow exists with id {}: {}", workflowId, exists);
-        return exists;
-    }
+    private void validateUiConfigStructure(JsonNode jsonNode) {
+        if (!jsonNode.has("steps") || !jsonNode.has("transitions")) {
+            throw new IllegalArgumentException("UI configuration must contain 'steps' and 'transitions' arrays");
+        }
 
-    /**
-     * Retrieves workflow count.
-     *
-     * @return Total number of workflows
-     */
-    @Transactional(readOnly = true)
-    public long getWorkflowCount() {
-        long count = workflowRepository.count();
-        log.debug("Retrieved total workflow count: {}", count);
-        return count;
+        if (!jsonNode.get("steps").isArray()) {
+            throw new IllegalArgumentException("Steps must be an array");
+        }
+
+        if (!jsonNode.get("transitions").isArray()) {
+            throw new IllegalArgumentException("Transitions must be an array");
+        }
+
+        jsonNode.get("steps").forEach(step -> {
+            if (!step.has("stepId") || !step.has("position") || !step.has("data")) {
+                throw new IllegalArgumentException("Each step must contain stepId, position, and data fields");
+            }
+        });
+
+        jsonNode.get("transitions").forEach(transition -> {
+            if (!transition.has("id") || !transition.has("source") || !transition.has("target")) {
+                throw new IllegalArgumentException("Each transition must contain id, source, and target fields");
+            }
+        });
     }
 }

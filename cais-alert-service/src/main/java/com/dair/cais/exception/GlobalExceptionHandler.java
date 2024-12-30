@@ -4,6 +4,7 @@ import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
 import com.dair.cais.steps.exception.StepNameAlreadyExistsException;
 import com.dair.cais.steps.exception.StepNotFoundException;
+import com.dair.cais.workflow.exception.WorkflowUpdateException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -113,6 +114,25 @@ public class GlobalExceptionHandler {
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", ex.getMessage());
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(WorkflowUpdateException.class)
+    public ResponseEntity<Map<String, Object>> handleWorkflowUpdateException(
+            WorkflowUpdateException ex,
+            WebRequest request) {
+
+        log.error("Workflow update failed", ex);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Workflow Update Error");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(body);
     }
 
 }

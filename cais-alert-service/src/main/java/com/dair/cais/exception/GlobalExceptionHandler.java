@@ -4,7 +4,10 @@ import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
 import com.dair.cais.steps.exception.StepNameAlreadyExistsException;
 import com.dair.cais.steps.exception.StepNotFoundException;
+import com.dair.cais.workflow.exception.ErrorResponse;
+import com.dair.cais.workflow.exception.ResourceAlreadyExistsException;
 import com.dair.cais.workflow.exception.WorkflowUpdateException;
+import com.dair.cais.workflow.exception.WorkflowValidationException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -133,6 +136,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(body);
+    }
+
+    @ExceptionHandler(ResourceAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleResourceAlreadyExistsException(
+            ResourceAlreadyExistsException ex, WebRequest request) {
+        log.error("Resource already exists: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(
+                "CONFLICT",
+                ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    @ExceptionHandler(WorkflowValidationException.class)
+    public ResponseEntity<ErrorResponse> handleWorkflowValidationException(
+            WorkflowValidationException ex, WebRequest request) {
+        log.error("Validation error: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(
+                "VALIDATION_ERROR",
+                ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
 }

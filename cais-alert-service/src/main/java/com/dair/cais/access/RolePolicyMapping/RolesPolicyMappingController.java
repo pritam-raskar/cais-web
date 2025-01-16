@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -104,35 +106,62 @@ public class RolesPolicyMappingController {
 
     @PutMapping("/role/{roleId}")
     @Operation(summary = "Update policy mappings for a role",
-            description = "Updates policy mappings for a role. Adds new mappings if they don't exist and removes mappings that aren't in the request.",
+            description = "Updates policy mappings for a role. Adds new mappings if they don't exist and removes existing mappings if request is empty.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Mappings successfully updated"),
-                    @ApiResponse(responseCode = "400", description = "Invalid request"),
-                    @ApiResponse(responseCode = "404", description = "Role or Policy not found"),
+                    @ApiResponse(responseCode = "404", description = "Role not found"),
                     @ApiResponse(responseCode = "500", description = "Internal server error")
             })
     public ResponseEntity<List<RolesPolicyMapping>> updateRolePolicyMappings(
             @Parameter(description = "ID of the role to update", required = true)
             @PathVariable @NotNull Integer roleId,
 
-            @Parameter(description = "List of policy mappings to update", required = true)
-            @RequestBody @NotEmpty List<@Valid RolePolicyRequest> requests) {
+            @Parameter(description = "List of policy mappings to update. If empty or null, all existing mappings will be removed.")
+            @RequestBody(required = false) List<@Valid RolePolicyRequest> requests) {
 
-        // Validate that all roleIds in the request match the path parameter
-        if (requests.stream().anyMatch(req -> !req.roleId().equals(roleId))) {
-            log.error("Request contains roleId that doesn't match path parameter: {}", roleId);
-            throw new IllegalArgumentException("All roleId values must match the path parameter");
+        log.debug("Starting policy mapping update for role ID: {}", roleId);
+
+        try {
+            // Handle null request body by converting to empty list
+            List<RolePolicyRequest> requestList = requests != null ? requests : Collections.emptyList();
+
+            // Validate requests if not empty
+            if (!requestList.isEmpty()) {
+                validateRolePolicyRequests(roleId, requestList);
+            }
+
+            log.info("Processing policy mapping update for role ID: {}, number of policies: {}",
+                    roleId, requestList.size());
+
+            List<RolesPolicyMapping> updatedMappings = service.updateRolePolicyMappings(roleId, requestList);
+
+            log.info("Successfully updated policy mappings for role ID: {}. New mapping count: {}",
+                    roleId, updatedMappings.size());
+
+            return ResponseEntity.ok(updatedMappings);
+
+        } catch (EntityNotFoundException e) {
+            log.error("Role not found with ID: {}", roleId);
+            throw e;
+        } catch (Exception e) {
+            log.error("Error updating policy mappings for role ID: {}", roleId, e);
+            throw new RolePolicyMappingException("Failed to update policy mappings", e);
         }
+    }
 
-        log.info("Received request to update policy mappings for role ID: {}, number of policies: {}",
-                roleId, requests.size());
-
-        List<RolesPolicyMapping> updatedMappings = service.updateRolePolicyMappings(roleId, requests);
-
-        log.info("Successfully updated policy mappings for role ID: {}, updated mappings count: {}",
-                roleId, updatedMappings.size());
-
-        return ResponseEntity.ok(updatedMappings);
+    /**
+     * Validates the role policy requests against the provided role ID.
+     *
+     * @param roleId The role ID to validate against
+     * @param requests The list of role policy requests to validate
+     * @throws IllegalArgumentException if validation fails
+     */
+    private void validateRolePolicyRequests(Integer roleId, List<RolePolicyRequest> requests) {
+        if (requests.stream().anyMatch(req -> !req.roleId().equals(roleId))) {
+            String message = String.format("Request contains roleId that doesn't match path parameter: %d", roleId);
+            log.error(message);
+            throw new IllegalArgumentException(message);
+        }
     }
 
     @Schema(description = "Request object for updating role-policy mappings")

@@ -17,48 +17,68 @@ public class ConnectionValidationService {
      * @throws ConnectionValidationException if validation fails
      */
     public void validateConnectionDetails(ConnectionDetails details) {
-        log.debug("Validating connection details");
+        log.debug("Starting connection details validation");
         List<String> errors = new ArrayList<>();
 
-        validateBasicFields(details, errors);
+        try {
+            validateBasicFields(details, errors);
 
-        if (!errors.isEmpty()) {
-            String errorMessage = "Connection validation failed";
-            String errorDetails = String.join(", ", errors);
-            log.error("{}: {}", errorMessage, errorDetails);
-            throw new ConnectionValidationException(errorMessage, errorDetails);
+            if (!errors.isEmpty()) {
+                String errorMessage = "Connection validation failed";
+                String errorDetails = String.join(", ", errors);
+                log.error("{}: {}", errorMessage, errorDetails);
+                throw new ConnectionValidationException(errorMessage, errorDetails);
+            }
+            log.debug("Connection details validation completed successfully");
+        } catch (ConnectionValidationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during connection validation: {}", e.getMessage(), e);
+            throw new ConnectionValidationException("Unexpected error during connection validation", e);
         }
     }
 
     private void validateBasicFields(ConnectionDetails details, List<String> errors) {
         if (details == null) {
-            errors.add("Connection details cannot be null");
-            return;
+            log.error("Connection details object is null");
+            throw new ConnectionValidationException("Connection details cannot be null");
         }
 
         // Host validation
         if (!StringUtils.hasText(details.getHost())) {
             errors.add("Host is required");
+            log.debug("Host validation failed: empty or null");
+        } else if (details.getHost().length() > 255) {
+            errors.add("Host cannot exceed 255 characters");
+            log.debug("Host validation failed: exceeds length limit");
         }
 
         // Port validation
         if (details.getPort() == null) {
             errors.add("Port is required");
+            log.debug("Port validation failed: null value");
         } else if (details.getPort() <= 0 || details.getPort() > 65535) {
             errors.add("Port must be between 1 and 65535");
+            log.debug("Port validation failed: invalid range - {}", details.getPort());
         }
 
         // Database validation
         if (!StringUtils.hasText(details.getDatabase())) {
             errors.add("Database name is required");
+            log.debug("Database validation failed: empty or null");
+        } else if (details.getDatabase().length() > 100) {
+            errors.add("Database name cannot exceed 100 characters");
+            log.debug("Database validation failed: exceeds length limit");
         }
 
-        // Credential validation
+        // Credential validation with proper logging
         if (!StringUtils.hasText(details.getUsername())) {
             errors.add("Username is required");
+            log.debug("Username validation failed: empty or null");
         }
         if (!StringUtils.hasText(details.getPassword())) {
             errors.add("Password is required");
+            log.debug("Password validation failed: empty or null");
         }
     }
 

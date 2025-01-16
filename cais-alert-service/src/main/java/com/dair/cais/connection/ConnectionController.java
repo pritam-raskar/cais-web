@@ -1,5 +1,6 @@
 package com.dair.cais.connection;
 
+import com.dair.cais.connection.validation.ConnectionTestResult;
 import com.dair.cais.exception.ConnectionValidationException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -62,14 +64,22 @@ public class ConnectionController {
             @Parameter(description = "ID of the connection to test")
             @PathVariable Long connectionId,
             @RequestBody(required = false) ConnectionDetails testDetails) {
-        log.info("Received request to test connection with ID: {}", connectionId);
-        boolean isValid = connectionService.testConnection(connectionId, testDetails);
-        //boolean isValid = connectionService.getConnectionAndTestQuery(connectionId, "SELECT * FROM info_alert.cm_connection LIMIT 10");
 
-        Map<String, Object> response = Map.of(
-                "success", isValid,
-                "message", isValid ? "Connection successful" : "Connection failed"
-        );
+        log.info("Received request to test connection with ID: {}", connectionId);
+
+        ConnectionTestResult testResult = connectionService.testConnection(connectionId, testDetails);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", testResult.isSuccess());
+        response.put("message", testResult.isSuccess() ?
+                "Connection successful" : testResult.getErrorMessage());
+
+        if (!testResult.isSuccess()) {
+            response.put("errorType", testResult.getErrorType());
+            if (log.isDebugEnabled()) {
+                response.put("technicalDetails", testResult.getTechnicalDetails());
+            }
+        }
 
         return ResponseEntity.ok(response);
     }
@@ -121,7 +131,7 @@ public class ConnectionController {
     @PostMapping("/decrypt")
     @Operation(
             summary = "Decrypt encrypted data",
-            description = "Decrypts data using provided IV and encrypted content",
+            description = "Decrypts data using provided IV and encrypted content, returns the decrypted string",
             security = @SecurityRequirement(name = "bearer-key")
     )
     @ApiResponse(responseCode = "200", description = "Data successfully decrypted")
@@ -132,17 +142,19 @@ public class ConnectionController {
         log.debug("Received request to decrypt data");
 
         try {
-            String decryptedData = encryptionService.decryptObject(
+            String decryptedData = encryptionService.decryptToString(
                     request.getEncryptedData(),
-                    request.getIv(),
-                    String.class
+                    request.getIv()
             );
 
             log.debug("Successfully decrypted data");
             return ResponseEntity.ok(new DecryptionResponse(decryptedData));
 
-        } catch (RuntimeException e) {
+        } catch (DecryptionException e) {
             log.error("Failed to decrypt data: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during decryption: {}", e.getMessage());
             throw new DecryptionException("Failed to decrypt data", e);
         }
     }

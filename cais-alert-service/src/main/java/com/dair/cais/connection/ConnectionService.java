@@ -1,6 +1,9 @@
 package com.dair.cais.connection;
 
+import com.dair.cais.connection.validation.ConnectionErrorType;
+import com.dair.cais.connection.validation.ConnectionTestResult;
 import com.dair.cais.exception.ConnectionValidationException;
+import com.dair.cais.reports.exception.ConnectionNotFoundException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,27 +76,195 @@ public class ConnectionService  implements DisposableBean {
     }
 
     @Transactional(readOnly = true)
-    public boolean testConnection(Long connectionId, ConnectionDetails testDetails) {
+    public ConnectionTestResult testConnection(Long connectionId, ConnectionDetails testDetails) {
         log.info("Testing connection with ID: {}", connectionId);
 
-        ConnectionEntity entity = repository.findById(connectionId)
-                .orElseThrow(() -> {
-                    log.error("Connection not found with ID: {}", connectionId);
-                    return new ConnectionValidationException("Connection not found");
-                });
+        try {
+            ConnectionEntity entity = repository.findById(connectionId)
+                    .orElseThrow(() -> new ConnectionNotFoundException(connectionId));
+
+            ConnectionDetails detailsToTest = testDetails;
+            if (detailsToTest == null) {
+                detailsToTest = encryptionService.decryptObject(
+                        entity.getEncryptedData(),
+                        entity.getIv(),
+                        ConnectionDetails.class
+                );
+            }
+
+            validationService.validateConnectionDetails(detailsToTest);
+            return testConnectionByType(entity.getConnectionType(), detailsToTest, entity);
+
+        } catch (ConnectionNotFoundException e) {
+            log.error("Connection not found: {}", connectionId);
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.INVALID_CONFIGURATION,
+                    "Connection not found",
+                    e.getMessage(),
+                    connectionId,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("Error testing connection {}: {}", connectionId, e.getMessage(), e);
+            return handleConnectionError(e, connectionId, null);
+        }
+    }
+
+    private ConnectionTestResult testConnectionByType(ConnectionType connectionType,
+                                                      ConnectionDetails details, ConnectionEntity entity) {
+        switch (connectionType) {
+            case POSTGRESQL:
+                return testPostgresqlConnection(details, entity);
+            /*case MONGODB:
+                return testMongoDbConnection(details, entity);
+            case MYSQL:
+            case MARIADB:
+                return testMysqlConnection(details, entity);*/
+            /*case SNOWFLAKE:
+                return testSnowflakeConnection(details);*/
+            default:
+                String message = "Unsupported connection type: " + connectionType;
+                log.error(message);
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.INVALID_CONFIGURATION,
+                        message,
+                        null,
+                        entity.getConnectionId(),
+                        entity.getConnectionName()
+                );
+        }
+    }
+
+    private ConnectionTestResult testPostgresqlConnection(ConnectionDetails details, ConnectionEntity entity) {
+        String url = String.format("jdbc:postgresql://%s:%d/%s",
+                details.getHost(), details.getPort(), details.getDatabase());
 
         try {
-            validationService.validateConnectionDetails(testDetails);
+            Class.forName("org.postgresql.Driver");
+            try (java.sql.Connection conn = DriverManager.getConnection(
+                    url,
+                    details.getUsername(),
+                    details.getPassword())) {
 
-            if (testConnectionByType(entity.getConnectionType(), testDetails)) {
-                saveConnectionDetails(entity, testDetails);
-                return true;
+                if (conn.isValid(5)) {
+                    // Test basic query execution
+                    try (Statement stmt = conn.createStatement()) {
+                        stmt.execute("SELECT 1");
+                        return ConnectionTestResult.success(
+                                entity.getConnectionId(),
+                                entity.getConnectionName()
+                        );
+                    }
+                }
+                throw new SQLException("Connection validation failed");
             }
-            return false;
-        } catch (Exception e) {
-            log.error("Error testing connection with ID: {}", connectionId, e);
-            return false;
+        } catch (ClassNotFoundException e) {
+            log.error("PostgreSQL driver not found", e);
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.DRIVER_ERROR,
+                    "PostgreSQL driver not found",
+                    e.getMessage(),
+                    entity.getConnectionId(),
+                    entity.getConnectionName()
+            );
+        } catch (SQLException e) {
+            return handlePostgresqlError(e, entity);
         }
+    }
+
+    private ConnectionTestResult handlePostgresqlError(SQLException e, ConnectionEntity entity) {
+        String sqlState = e.getSQLState();
+        if (sqlState != null) {
+            switch (sqlState) {
+                case "28P01": // Invalid password
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.AUTHENTICATION_FAILED,
+                            "Invalid username or password",
+                            e.getMessage(),
+                            entity.getConnectionId(),
+                            entity.getConnectionName()
+                    );
+                case "3D000": // Database does not exist
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.DATABASE_NOT_FOUND,
+                            "Database does not exist",
+                            e.getMessage(),
+                            entity.getConnectionId(),
+                            entity.getConnectionName()
+                    );
+                case "42501": // Permission denied
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.PERMISSION_DENIED,
+                            "User lacks required permissions",
+                            e.getMessage(),
+                            entity.getConnectionId(),
+                            entity.getConnectionName()
+                    );
+                // Add more specific error codes as needed
+            }
+        }
+
+        if (e.getMessage().contains("Connection refused")) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.PORT_BLOCKED,
+                    "Connection refused - Port may be blocked or server is not running",
+                    e.getMessage(),
+                    entity.getConnectionId(),
+                    entity.getConnectionName()
+            );
+        }
+
+        if (e.getMessage().contains("timeout")) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.SERVER_UNREACHABLE,
+                    "Connection timed out - Server may be down or unreachable",
+                    e.getMessage(),
+                    entity.getConnectionId(),
+                    entity.getConnectionName()
+            );
+        }
+
+        // Generic error handler
+        return ConnectionTestResult.failure(
+                ConnectionErrorType.UNKNOWN,
+                "Database connection failed",
+                e.getMessage(),
+                entity.getConnectionId(),
+                entity.getConnectionName()
+        );
+    }
+
+    // Similar implementations for MySQL, MongoDB, and Snowflake...
+    // Each with their specific error codes and messages
+
+    private ConnectionTestResult handleConnectionError(Exception e, Long connectionId, String connectionName) {
+        if (e instanceof ConnectException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.NETWORK_ERROR,
+                    "Network connection failed - Check if the server is reachable",
+                    e.getMessage(),
+                    connectionId,
+                    connectionName
+            );
+        }
+
+        if (e instanceof SocketTimeoutException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.SERVER_UNREACHABLE,
+                    "Connection timed out - Server may be down or network is slow",
+                    e.getMessage(),
+                    connectionId,
+                    connectionName
+            );
+        }
+
+        return ConnectionTestResult.failure(
+                ConnectionErrorType.UNKNOWN,
+                "An unexpected error occurred while testing the connection",
+                e.getMessage(),
+                connectionId,
+                connectionName
+        );
     }
 
     @Transactional
@@ -198,7 +373,7 @@ public class ConnectionService  implements DisposableBean {
         }
     }
 
-    private boolean testSnowflakeConnection(ConnectionDetails details) {
+    private Boolean testSnowflakeConnection(ConnectionDetails details) {
         String url = String.format("jdbc:snowflake://%s.snowflakecomputing.com/?db=%s&warehouse=%s",
                 details.getHost(), details.getDatabase(), details.getAdditionalParams());
 
@@ -208,10 +383,17 @@ public class ConnectionService  implements DisposableBean {
                     url,
                     details.getUsername(),
                     details.getPassword())) {
-                return conn.isValid(5);
+                if (conn.isValid(5)) {
+                    try (java.sql.Statement stmt = conn.createStatement()) {
+                        stmt.execute("SELECT 1");
+                        //return ConnectionTestResult.success(null, null); // Update with actual connection details
+                        return true;
+                    }
+                }
+                throw new SQLException("Connection validation failed");
             }
         } catch (Exception e) {
-            log.error("Error testing Snowflake connection: {}", e.getMessage());
+            //return handleSnowflakeError(e, details);
             return false;
         }
     }
@@ -554,6 +736,228 @@ public class ConnectionService  implements DisposableBean {
     public void destroy() {
         log.info("Destroying ConnectionService, cleaning up connection pools");
         closeAllConnectionPools();
+    }
+
+    private ConnectionTestResult handleSnowflakeError(Exception e, ConnectionDetails details) {
+        if (e instanceof SQLException) {
+            SQLException sqlException = (SQLException) e;
+            String sqlState = sqlException.getSQLState();
+            String errorMessage = sqlException.getMessage();
+
+            // Snowflake specific error codes
+            if (sqlState != null) {
+                switch (sqlState) {
+                    case "28000": // Authentication failure
+                        return ConnectionTestResult.failure(
+                                ConnectionErrorType.AUTHENTICATION_FAILED,
+                                "Invalid username or password for Snowflake",
+                                errorMessage,
+                                null,
+                                null
+                        );
+                    case "02000": // No connection
+                        return ConnectionTestResult.failure(
+                                ConnectionErrorType.SERVER_UNREACHABLE,
+                                "Unable to connect to Snowflake server",
+                                errorMessage,
+                                null,
+                                null
+                        );
+                    case "42000": // Syntax error or access violation
+                        return ConnectionTestResult.failure(
+                                ConnectionErrorType.PERMISSION_DENIED,
+                                "Access denied or invalid warehouse configuration",
+                                errorMessage,
+                                null,
+                                null
+                        );
+                }
+            }
+
+            // Check error message patterns
+            if (errorMessage.contains("warehouse") || errorMessage.contains("WAREHOUSE")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.INVALID_CONFIGURATION,
+                        "Invalid warehouse configuration",
+                        errorMessage,
+                        null,
+                        null
+                );
+            }
+
+            if (errorMessage.contains("timeout") || errorMessage.contains("TIMEOUT")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.SERVER_UNREACHABLE,
+                        "Connection timed out while connecting to Snowflake",
+                        errorMessage,
+                        null,
+                        null
+                );
+            }
+        }
+
+        // Network related errors
+        if (e instanceof ConnectException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.NETWORK_ERROR,
+                    "Network error while connecting to Snowflake",
+                    e.getMessage(),
+                    null,
+                    null
+            );
+        }
+
+        if (e instanceof SocketTimeoutException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.SERVER_UNREACHABLE,
+                    "Connection timed out - Snowflake server may be unreachable",
+                    e.getMessage(),
+                    null,
+                    null
+            );
+        }
+
+        // Default error handler
+        log.error("Unexpected Snowflake connection error: {}", e.getMessage(), e);
+        return ConnectionTestResult.failure(
+                ConnectionErrorType.UNKNOWN,
+                "Failed to connect to Snowflake",
+                e.getMessage(),
+                null,
+                null
+        );
+    }
+
+    private ConnectionTestResult handleMySQLError(Exception e, ConnectionDetails details) {
+        if (e instanceof SQLException) {
+            SQLException sqlException = (SQLException) e;
+            int errorCode = sqlException.getErrorCode();
+            String message = sqlException.getMessage();
+
+            // MySQL specific error codes
+            switch (errorCode) {
+                case 1045: // Access denied
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.AUTHENTICATION_FAILED,
+                            "Invalid username or password for MySQL",
+                            message,
+                            null,
+                            null
+                    );
+                case 1049: // Unknown database
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.DATABASE_NOT_FOUND,
+                            "Database does not exist: " + details.getDatabase(),
+                            message,
+                            null,
+                            null
+                    );
+                case 1044: // Access denied for database
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.PERMISSION_DENIED,
+                            "User lacks permission to access database",
+                            message,
+                            null,
+                            null
+                    );
+                case 1042: // Unable to connect
+                    return ConnectionTestResult.failure(
+                            ConnectionErrorType.SERVER_UNREACHABLE,
+                            "Cannot connect to MySQL server",
+                            message,
+                            null,
+                            null
+                    );
+            }
+        }
+
+        // Network related errors
+        if (e instanceof ConnectException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.NETWORK_ERROR,
+                    "Network error while connecting to MySQL server",
+                    e.getMessage(),
+                    null,
+                    null
+            );
+        }
+
+        // Default error handler
+        log.error("Unexpected MySQL connection error: {}", e.getMessage(), e);
+        return ConnectionTestResult.failure(
+                ConnectionErrorType.UNKNOWN,
+                "Failed to connect to MySQL server",
+                e.getMessage(),
+                null,
+                null
+        );
+    }
+
+    private ConnectionTestResult handleMongoError(Exception e, ConnectionDetails details) {
+        String message = e.getMessage();
+
+        if (message != null) {
+            if (message.contains("Authentication failed")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.AUTHENTICATION_FAILED,
+                        "Invalid username or password for MongoDB",
+                        message,
+                        null,
+                        null
+                );
+            }
+
+            if (message.contains("not authorized")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.PERMISSION_DENIED,
+                        "User lacks required permissions",
+                        message,
+                        null,
+                        null
+                );
+            }
+
+            if (message.contains("Connection refused")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.PORT_BLOCKED,
+                        "MongoDB server refused connection - check if port is open",
+                        message,
+                        null,
+                        null
+                );
+            }
+
+            if (message.contains("timed out")) {
+                return ConnectionTestResult.failure(
+                        ConnectionErrorType.SERVER_UNREACHABLE,
+                        "Connection timed out - MongoDB server may be unreachable",
+                        message,
+                        null,
+                        null
+                );
+            }
+        }
+
+        // Network related errors
+        if (e instanceof ConnectException) {
+            return ConnectionTestResult.failure(
+                    ConnectionErrorType.NETWORK_ERROR,
+                    "Network error while connecting to MongoDB",
+                    e.getMessage(),
+                    null,
+                    null
+            );
+        }
+
+        // Default error handler
+        log.error("Unexpected MongoDB connection error: {}", e.getMessage(), e);
+        return ConnectionTestResult.failure(
+                ConnectionErrorType.UNKNOWN,
+                "Failed to connect to MongoDB server",
+                e.getMessage(),
+                null,
+                null
+        );
     }
 
 }

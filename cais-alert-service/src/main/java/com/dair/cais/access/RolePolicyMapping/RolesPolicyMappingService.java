@@ -204,18 +204,34 @@ public class RolesPolicyMappingService {
                     return new ResourceNotFoundException("Role not found with ID: " + roleId);
                 });
 
-        // Get all requested policy IDs
-        Set<Integer> requestedPolicyIds = requests.stream()
-                .map(RolesPolicyMappingController.RolePolicyRequest::policyId)
-                .collect(Collectors.toSet());
-
-        // Validate and get all policies
-        Map<Integer, PolicyEntity> policyMap = validateAndGetPolicies(requestedPolicyIds);
-
         try {
+            // Handle null requests by converting to empty list
+            List<RolesPolicyMappingController.RolePolicyRequest> requestList =
+                    requests != null ? requests : Collections.emptyList();
+
             // Get existing mappings
             List<RolesPolicyMappingEntity> existingMappings =
                     repository.findByRoleRoleIdWithPolicyAndRole(roleId);
+
+            // If request is empty, remove all existing mappings
+            if (requestList.isEmpty()) {
+                if (!existingMappings.isEmpty()) {
+                    log.info("Removing all {} existing policy mappings for role ID: {}",
+                            existingMappings.size(), roleId);
+                    repository.deleteAll(existingMappings);
+                } else {
+                    log.debug("No existing mappings to remove for role ID: {}", roleId);
+                }
+                return Collections.emptyList();
+            }
+
+            // Get all requested policy IDs
+            Set<Integer> requestedPolicyIds = requestList.stream()
+                    .map(RolesPolicyMappingController.RolePolicyRequest::policyId)
+                    .collect(Collectors.toSet());
+
+            // Validate and get all policies
+            Map<Integer, PolicyEntity> policyMap = validateAndGetPolicies(requestedPolicyIds);
 
             // Create set of existing policy IDs
             Set<Integer> existingPolicyIds = existingMappings.stream()

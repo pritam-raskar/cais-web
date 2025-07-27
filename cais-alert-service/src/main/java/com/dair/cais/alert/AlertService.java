@@ -3,6 +3,8 @@ package com.dair.cais.alert;
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
 import com.dair.cais.access.user.UserEntity;
 import com.dair.cais.access.user.UserRepository;
+import com.dair.cais.alert.dto.StepInfo;
+import com.dair.cais.alert.dto.StepTransitionDTO;
 import com.dair.cais.alert.exception.AlertCreationException;
 import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.alert.exception.AlertValidationException;
@@ -20,15 +22,24 @@ import com.dair.cais.steps.Step;
 import com.dair.cais.steps.StepRepository;
 import com.dair.cais.steps.StepStatus;
 import com.dair.cais.steps.StepStatusRepository;
+import com.dair.cais.type.AlertTypeExtended;
+import com.dair.cais.type.AlertTypeServiceExtended;
+import com.dair.cais.workflow.entity.WorkflowStepEntity;
+import com.dair.cais.workflow.entity.WorkflowTransitionEntity;
+import com.dair.cais.workflow.repository.WorkflowTransitionRepository;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
@@ -70,6 +81,10 @@ public class AlertService {
    private final UserRepository userRepository;
    private final OrganizationFamilyRepository orgFamilyRepository;
    private final MongoQueryBuilder mongoQueryBuilder;
+   private final WorkflowTransitionRepository workflowTransitionRepository;
+
+   @Autowired
+   private AlertTypeServiceExtended alertTypeServiceExtended;
 
 
 
@@ -1205,6 +1220,121 @@ public class AlertService {
       if (errorMessage.length() > 0) {
          throw new CaisIllegalArgumentException(errorMessage.toString());
       }
+   }
+
+   @Transactional(readOnly = true)
+   public StepTransitionDTO getAlertStepTransitions(String alertId) {
+      log.debug("Getting step transitions for alert ID: {}", alertId);
+
+      try {
+         // Get alert details
+         Alert alert = getAlertOnId(alertId);
+         if (alert == null) {
+            throw new EntityNotFoundException("Alert not found with ID: " + alertId);
+         }
+
+         if (alert.getAlertTypeId() == null) {
+            throw new IllegalStateException("Alert type ID is not set for alert: " + alertId);
+         }
+
+         // Get alert type configuration from MongoDB
+         AlertTypeExtended alertType = alertTypeServiceExtended.getAlertTypeFields(alert.getAlertTypeId());
+         if (alertType == null) {
+            throw new EntityNotFoundException("Alert type not found with ID: " + alert.getAlertTypeId());
+         }
+
+         // Parse field schema to get workflow ID
+         Long workflowId = extractWorkflowIdFromAlertType(alertType);
+         if (workflowId == null) {
+            throw new IllegalStateException("No workflow ID found in alert type configuration");
+         }
+
+         if (alert.getAlertStepId() == null) {
+            throw new IllegalStateException("Alert does not have a current step assigned");
+         }
+
+         Long currentStepId = Long.parseLong(alert.getAlertStepId());
+
+         // TODO: WF transition mapping in database is enterd as 17 & 18 instead of 70 & 6 (WF ID), may be because it is inserting step id's id
+         // fix the ui update first, that will fix the issue.
+
+         // Get next steps from workflow_transition table where current step is source
+         List<WorkflowTransitionEntity> nextTransitions = workflowTransitionRepository
+                 .findByWorkflowWorkflowIdAndSourceStepWorkflowStepId(workflowId, currentStepId);
+
+         // Get previous steps from workflow_transition table where current step is target
+         List<WorkflowTransitionEntity> previousTransitions = workflowTransitionRepository
+                 .findByWorkflowWorkflowIdAndTargetStepWorkflowStepId(workflowId, currentStepId);
+
+         StepTransitionDTO transitionDTO = new StepTransitionDTO();
+
+         // Map next steps
+         List<StepInfo> nextSteps = nextTransitions.stream()
+                 .map(transition -> {
+                    StepInfo stepInfo = new StepInfo();
+                    WorkflowStepEntity targetStep = transition.getTargetStep();
+                    stepInfo.setStepId(targetStep.getStep().getStepId());
+                    stepInfo.setLabel(targetStep.getLabel());
+                    return stepInfo;
+                 })
+                 .collect(Collectors.toList());
+
+         // Map previous steps
+         List<StepInfo> backSteps = previousTransitions.stream()
+                 .map(transition -> {
+                    StepInfo stepInfo = new StepInfo();
+                    WorkflowStepEntity sourceStep = transition.getSourceStep();
+                    stepInfo.setStepId(sourceStep.getStep().getStepId());
+                    stepInfo.setLabel(sourceStep.getLabel());
+                    return stepInfo;
+                 })
+                 .collect(Collectors.toList());
+
+         transitionDTO.setNextSteps(nextSteps);
+         transitionDTO.setBackSteps(backSteps);
+
+         log.debug("Found {} next steps and {} back steps for alert ID: {}",
+                 nextSteps.size(), backSteps.size(), alertId);
+
+         return transitionDTO;
+
+      } catch (EntityNotFoundException e) {
+         log.error("Entity not found: {}", e.getMessage());
+         throw e;
+      } catch (NumberFormatException e) {
+         log.error("Invalid step ID format for alert ID: {}", alertId, e);
+         throw new IllegalArgumentException("Invalid step ID format: " + e.getMessage());
+      } catch (Exception e) {
+         log.error("Error retrieving step transitions for alert ID: {}", alertId, e);
+         throw new IllegalStateException("Error retrieving step transitions: " + e.getMessage());
+      }
+   }
+
+   /**
+    * Extracts workflow ID from alert type configuration
+    * @param alertType The alert type containing workflow configuration
+    * @return The workflow ID
+    * @throws IllegalStateException if workflow ID cannot be extracted
+    */
+   private Long extractWorkflowIdFromAlertType(AlertTypeExtended alertType) {
+      // Validate input parameter
+      if (alertType == null) {
+         throw new IllegalArgumentException("AlertTypeExtended cannot be null");
+      }
+
+      // Check workflow ID
+      Integer wfId = alertType.getWorkflowId();
+      if (wfId == null) {
+         throw new IllegalStateException("Workflow ID not found in alert type configuration");
+      }
+
+      // Additional validation to ensure workflow ID is positive
+      if (wfId <= 0) {
+         throw new IllegalArgumentException("Workflow ID must be a positive integer");
+      }
+
+      // Convert and return the workflow ID
+      return Long.valueOf(wfId);
    }
 }
 

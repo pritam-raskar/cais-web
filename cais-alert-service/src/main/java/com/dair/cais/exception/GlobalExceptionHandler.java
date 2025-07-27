@@ -10,6 +10,8 @@ import com.dair.cais.workflow.exception.WorkflowUpdateException;
 import com.dair.cais.workflow.exception.WorkflowValidationException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,14 @@ import java.util.Map;
 @Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Map<String, String> CONSTRAINT_MAP = new HashMap<>();
+
+    static {
+        // Map constraint names to user-friendly error messages
+        CONSTRAINT_MAP.put("fk_case_type_workflow", "The specified workflow does not exist");
+        // Add more constraint mappings as needed
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleEntityNotFoundException(EntityNotFoundException ex) {
@@ -57,6 +67,59 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    /**
+     * Handles DataIntegrityViolationException which occurs on DB constraint violations.
+     *
+     * @param ex the exception
+     * @return the error response
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        String message = "Data integrity violation occurred";
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        // Extract the specific constraint that was violated
+        if (ex.getCause() instanceof ConstraintViolationException) {
+            ConstraintViolationException constraintEx = (ConstraintViolationException) ex.getCause();
+            String constraintName = constraintEx.getConstraintName();
+            log.warn("Database constraint violation: {}", constraintName);
+
+            // Special handling for the workflow foreign key constraint
+            if (constraintName != null && constraintName.equals("fk_case_type_workflow")) {
+                message = "The specified workflow does not exist";
+            }
+            // Handle other known constraints
+            else if (constraintName != null && CONSTRAINT_MAP.containsKey(constraintName)) {
+                message = CONSTRAINT_MAP.get(constraintName);
+            }
+            // Generic message for other foreign key constraints
+            else if (constraintName != null &&
+                    (constraintName.toLowerCase().startsWith("fk_") ||
+                            constraintName.toLowerCase().contains("foreign"))) {
+                message = "Referenced record does not exist";
+            }
+        } else {
+            log.error("Data integrity violation occurred", ex);
+        }
+
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", message);
+        return new ResponseEntity<>(errorResponse, status);
+    }
+
+    /**
+     * Handles IllegalArgumentException for validation errors.
+     *
+     * @param ex the exception
+     * @return the error response
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("Invalid argument: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
 
     /**
      * Handles ReportRetrievalException and returns a standardized error response.
@@ -159,5 +222,4 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
-
 }

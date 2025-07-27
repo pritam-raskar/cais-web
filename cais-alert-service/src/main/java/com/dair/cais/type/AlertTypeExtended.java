@@ -24,4 +24,5 @@ public class AlertTypeExtended extends CaisBaseModel {
     private String mandatory_fields;
     private Date createdAt;
     private Date updatedAt;
+    private Integer workflowId;
 }

@@ -21,6 +21,7 @@ public class AlertTypeEntityExtended {
     private String mandatory_fields; // Store as JSON string
     private Date createdAt;
     private Date updatedAt;
+    private Integer workflowId;
 
     private static final ObjectMapper objectMapper = new ObjectMapper(); // Reuse ObjectMapper
 
@@ -38,6 +39,8 @@ public class AlertTypeEntityExtended {
     public void setActive(boolean active) { isActive = active; }
     public List<String> getExtraField() { return extraField; }
     public void setExtraField(List<String> extraField) { this.extraField = extraField; }
+    public Integer getWorkflowId() { return workflowId; }
+    //public void setWorkflowId(String workflowId) { this.workflowId = workflowId; }
 
     // Updated getter for field_schema to return List<Map<String, Object>>
     public List<Map<String, Object>> getField_schema() {

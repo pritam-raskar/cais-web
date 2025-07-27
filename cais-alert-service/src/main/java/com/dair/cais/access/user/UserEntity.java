@@ -9,7 +9,8 @@ import lombok.Data;
 @Table(name = "cm_users", schema = "info_alert")
 public class UserEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
+    //@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @SequenceGenerator(name = "user_seq", sequenceName = "info_alert.cm_users_user__id_seq", allocationSize = 1, schema = "info_alert")
     @Column(name = "user_id")
     private String userId;

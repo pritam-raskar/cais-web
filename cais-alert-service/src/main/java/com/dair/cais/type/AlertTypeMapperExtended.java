@@ -27,6 +27,7 @@ public class AlertTypeMapperExtended {
 
         type.setCreatedAt(entity.getCreatedAt());
         type.setUpdatedAt(entity.getUpdatedAt());
+        type.setWorkflowId(entity.getWorkflowId());
 
         return type;
     }
@@ -45,6 +46,7 @@ public class AlertTypeMapperExtended {
 
         entity.setCreatedAt(alertType.getCreatedAt());
         entity.setUpdatedAt(alertType.getUpdatedAt());
+        //entity.set(alertType.getWorkflowId());
     }
 
     public AlertTypeEntityExtended toEntity(AlertTypeExtended type) {

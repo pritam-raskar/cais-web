@@ -7,6 +7,7 @@ public class AttachmentMapperExtended {
 
     public ExtendedAttachment toModel(AttachmentEntityExtended attachmentEntityextended) {
         ExtendedAttachment attachmentextended  = new ExtendedAttachment();
+        attachmentextended.setId(attachmentEntityextended.getId());
         attachmentextended.setFileData(attachmentEntityextended.getFileData());
         attachmentextended.setAlertId(attachmentEntityextended.getAlertId());
         attachmentextended.setFileName(attachmentEntityextended.getFileName());
@@ -21,6 +22,7 @@ public class AttachmentMapperExtended {
     }
 
     private void mapAttachmentToEntity(ExtendedAttachment attachmentextended, AttachmentEntityExtended attachmententityextended) {
+        attachmententityextended.setId(attachmentextended.getId());
         attachmententityextended.setAlertId(attachmentextended.getAlertId());
         attachmententityextended.setFileData(attachmentextended.getFileData());
         attachmententityextended.setFileName(attachmentextended.getFileName());

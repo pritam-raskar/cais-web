@@ -1,10 +1,13 @@
 package com.dair.cais.note;
 
+import com.dair.cais.note.exception.NoteException;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import javax.validation.Valid;
 import java.util.Date;
@@ -25,19 +28,52 @@ public class NoteService {
    @Autowired
    private NoteMapperExtended noteMapperExtended;
 
-   @Autowired
-   private NoteExtended NoteExtended;
 
 
 
 
+
+   @Transactional
    public NoteExtended addNote(String note, String alertId, String createdBy, String entity, String entityValue) {
-      NoteEntityExtended addnote = noteRepository.addNote(note, alertId, createdBy, entity, entityValue);
-      return noteMapperExtended.toModel(addnote);
+      log.info("Adding note for alertId: {}, createdBy: {}", alertId, createdBy);
+      
+      validateNoteInput(note, alertId, createdBy, entity);
+      
+      try {
+         NoteEntityExtended addnote = noteRepository.addNote(note, alertId, createdBy, entity, entityValue);
+         log.info("Successfully added note for alertId: {}", alertId);
+         return noteMapperExtended.toModel(addnote);
+      } catch (Exception e) {
+         log.error("Failed to add note for alertId: {}, error: {}", alertId, e.getMessage());
+         throw new NoteException("Failed to add note: " + e.getMessage(), e);
+      }
+   }
+   
+   private void validateNoteInput(String note, String alertId, String createdBy, String entity) {
+      if (!StringUtils.hasText(note)) {
+         throw new NoteException("Note content cannot be empty");
+      }
+      
+      if (note.length() > 1000) {
+         throw new NoteException("Note content cannot exceed 1000 characters");
+      }
+      
+      if (!StringUtils.hasText(alertId)) {
+         throw new NoteException("Alert ID cannot be empty");
+      }
+      
+      if (!StringUtils.hasText(createdBy)) {
+         throw new NoteException("Created by cannot be empty");
+      }
+      
+      if (!StringUtils.hasText(entity)) {
+         throw new NoteException("Entity cannot be empty");
+      }
    }
 
 
    public List<NoteExtended> fetchNotes(String alertId) {
+      log.debug("Fetching notes for alertId: {}", alertId);
       return noteRepository.findByAlertId(alertId);
    }
 
@@ -116,11 +152,10 @@ public class NoteService {
       if (offset < 0) {
          errorMessage.append("offset cannot be negative;");
       }
-      if (errorMessage.isEmpty()) {
-         return;
+      if (errorMessage.length() > 0) {
+         log.warn("Validation failed: {}", errorMessage.toString());
+         throw new NoteException(errorMessage.toString());
       }
-
-      throw new CaisIllegalArgumentException(errorMessage.toString());
    }
 
 }

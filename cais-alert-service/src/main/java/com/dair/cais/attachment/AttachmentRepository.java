@@ -1,6 +1,7 @@
 package com.dair.cais.attachment;
 
 import com.dair.exception.CaisBaseException;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import static com.dair.cais.common.config.CaisAlertConstants.MONGO_COLLECTION_ALERT_ATTACHMENTS;
 
 @Repository
+@Slf4j
 public class AttachmentRepository {
 
     private final MongoTemplate mongoTemplate;
@@ -30,13 +32,23 @@ public class AttachmentRepository {
     }
 
     public ExtendedAttachment save(ExtendedAttachment attachment) {
-        return mongoTemplate.save(attachment, "attachments"); // Assuming 'attachments' is your collection name
+        return mongoTemplate.save(attachment, MONGO_COLLECTION_ALERT_ATTACHMENTS);
     }
 
     public List<AttachmentEntityExtended> getAttachmentsByAlertId(String alertId) {
         Query query = new Query(Criteria.where("alertId").is(alertId));
         query.fields().exclude("fileData");
-        return mongoTemplate.find(query, AttachmentEntityExtended.class, "attachments");
+        return mongoTemplate.find(query, AttachmentEntityExtended.class, MONGO_COLLECTION_ALERT_ATTACHMENTS);
+    }
+
+    public ExtendedAttachment getAttachmentWithFileData(String attachmentId) {
+        ObjectId id = new ObjectId(attachmentId);
+        return mongoTemplate.findById(id, ExtendedAttachment.class, MONGO_COLLECTION_ALERT_ATTACHMENTS);
+    }
+
+    public List<ExtendedAttachment> getAttachmentsWithFileDataByAlertId(String alertId) {
+        Query query = new Query(Criteria.where("alertId").is(alertId));
+        return mongoTemplate.find(query, ExtendedAttachment.class, MONGO_COLLECTION_ALERT_ATTACHMENTS);
     }
 
 
@@ -57,11 +69,11 @@ public class AttachmentRepository {
                 if (fieldValue.isPresent()
                         && field.getName() != "serialVersionUID"
                         && field.getName() != "id") {
-                    System.out.println(field.getName() + ": " + fieldValue.get());
+                    log.debug("Updating field {}: {}", field.getName(), fieldValue.get());
                     update.set(field.getName(), fieldValue.get());
                 }
             } catch (IllegalArgumentException | IllegalAccessException e) {
-                e.printStackTrace();
+                log.error("Error accessing field {}: {}", field.getName(), e.getMessage());
             }
         }
 

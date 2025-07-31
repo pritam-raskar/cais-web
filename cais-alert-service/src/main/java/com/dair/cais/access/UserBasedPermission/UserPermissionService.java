@@ -31,10 +31,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserPermissionService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UserPermissionService.class);
     private final UserRepository userRepository;
     private final UserOrgRoleMappingRepository userOrgRoleMappingRepository;
     private final RolesPolicyMappingRepository rolesPolicyMappingRepository;

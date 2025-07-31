@@ -33,7 +33,7 @@
 		<dependency>
 			<groupId>com.dair</groupId>
 			<artifactId>cais-base</artifactId>
-			<version>${parent.version}</version>
+			<version>${project.parent.version}</version>
 		</dependency>
 
 		<!-- Spring Boot Starters -->
@@ -56,6 +56,14 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.retry</groupId>
+			<artifactId>spring-retry</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
 		</dependency>
 
 		<!-- Database Drivers -->
@@ -99,6 +107,10 @@
 
 		<!-- Security -->
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-crypto</artifactId>
 		</dependency>
@@ -120,6 +132,13 @@
 			<artifactId>jjwt-jackson</artifactId>
 			<version>${jwt.version}</version>
 			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Environment Variables -->
+		<dependency>
+			<groupId>io.github.cdimascio</groupId>
+			<artifactId>dotenv-java</artifactId>
+			<version>3.0.0</version>
 		</dependency>
 
 		<!-- AWS -->

@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -110,13 +112,13 @@ public class AlertNoteController {
 
 
 
-   @PostMapping("/addnote")
+   @PostMapping("/addnote/{alertId}")
    @Operation(summary = "Add a note")
    public ResponseEntity<NoteExtended> AddNote(
-           @RequestParam("note") String note,
-           @PathVariable String alertId,
-           @RequestParam("createdBy") String createdBy,
-           @RequestParam("entity") String entity,
+           @RequestParam("note") @NotBlank @Size(max = 1000) String note,
+           @PathVariable @NotBlank String alertId,
+           @RequestParam("createdBy") @NotBlank String createdBy,
+           @RequestParam("entity") @NotBlank String entity,
            @RequestParam("entityValue") String entityValue) {
 
       NoteExtended createdNote = noteService.addNote(note, alertId, createdBy, entity, entityValue );

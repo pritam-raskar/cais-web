@@ -46,7 +46,7 @@ public class MongoQueryBuilder {
                 case ">=" -> Criteria.where(field).gte(parseNumeric(value));
                 case "<" -> Criteria.where(field).lt(parseNumeric(value));
                 case "<=" -> Criteria.where(field).lte(parseNumeric(value));
-                case "in" -> Criteria.where(field).in(value.split(","));
+                case "in" -> Criteria.where(field).in((Object[]) value.split(","));
                 case "contains" -> Criteria.where(field).regex(value, "i");
                 default -> {
                     log.warn("Unsupported operator: {}", rule.getOperator());

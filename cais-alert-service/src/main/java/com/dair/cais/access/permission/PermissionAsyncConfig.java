@@ -9,7 +9,7 @@ import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
-public class AsyncConfig {
+public class PermissionAsyncConfig {
 
     @Bean(name = "permissionRefreshExecutor")
     public Executor permissionRefreshExecutor() {

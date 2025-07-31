@@ -3,6 +3,8 @@ package com.dair.cais.alert;
 import com.dair.cais.access.UserBasedPermission.UserPermissionService;
 import com.dair.cais.access.user.UserEntity;
 import com.dair.cais.access.user.UserRepository;
+import com.dair.cais.alert.dto.BulkStepChangeRequest;
+import com.dair.cais.alert.dto.BulkStepChangeResponse;
 import com.dair.cais.alert.dto.StepInfo;
 import com.dair.cais.alert.dto.StepTransitionDTO;
 import com.dair.cais.alert.exception.AlertCreationException;
@@ -18,6 +20,7 @@ import com.dair.cais.audit.AuditTrailService;
 import com.dair.cais.common.config.CaisAlertConstants;
 import com.dair.cais.organization.OrganizationFamilyEntity;
 import com.dair.cais.organization.OrganizationFamilyRepository;
+import com.dair.cais.sla.StepSlaService;
 import com.dair.cais.steps.Step;
 import com.dair.cais.steps.StepRepository;
 import com.dair.cais.steps.StepStatus;
@@ -27,6 +30,12 @@ import com.dair.cais.type.AlertTypeServiceExtended;
 import com.dair.cais.workflow.entity.WorkflowStepEntity;
 import com.dair.cais.workflow.entity.WorkflowTransitionEntity;
 import com.dair.cais.workflow.repository.WorkflowTransitionRepository;
+import com.dair.cais.workflow.engine.WorkflowRuleEngine;
+import com.dair.cais.steps.permission.StepPermissionService;
+// TODO: Uncomment when services are properly implemented
+// import com.dair.cais.steps.notification.AsyncNotificationService;
+// import com.dair.cais.steps.notification.StepNotificationService;
+// import com.dair.cais.steps.assignment.StepAssignmentService;
 import com.dair.exception.CaisBaseException;
 import com.dair.exception.CaisIllegalArgumentException;
 import com.dair.exception.CaisNotFoundException;
@@ -48,7 +57,6 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -82,6 +90,12 @@ public class AlertService {
    private final OrganizationFamilyRepository orgFamilyRepository;
    private final MongoQueryBuilder mongoQueryBuilder;
    private final WorkflowTransitionRepository workflowTransitionRepository;
+   private final StepSlaService stepSlaService;
+   private final WorkflowRuleEngine workflowRuleEngine;
+   private final StepPermissionService stepPermissionService;
+   // TODO: Uncomment when services are properly implemented
+   // private final AsyncNotificationService asyncNotificationService;
+   // private final StepAssignmentService stepAssignmentService;
 
    @Autowired
    private AlertTypeServiceExtended alertTypeServiceExtended;
@@ -470,6 +484,279 @@ public class AlertService {
    }
 
    @Transactional
+   public Alert rollbackStep(String alertId, String rollbackReason) {
+      log.debug("Starting rollback for alertId: {}", alertId);
+      
+      try {
+         // Get current alert
+         AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
+         if (mongoAlert == null) {
+            throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
+         }
+         
+         // Find previous step from audit trail
+         String previousStepId = findPreviousStepFromAudit(alertId);
+         if (previousStepId == null) {
+            throw new CaisIllegalArgumentException("No previous step found for rollback");
+         }
+         
+         Long stepId = Long.parseLong(previousStepId);
+         log.info("Rolling back alertId: {} from step {} to step {}", alertId, mongoAlert.getAlertStepId(), stepId);
+         
+         // Perform the step change (reuse existing logic)
+         Alert rolledBackAlert = changeStep(alertId, stepId, "SYSTEM");
+         
+         // Log rollback action in audit trail
+         auditTrailService.logAction(
+            1L, // User ID as Long
+            "SYSTEM", 
+            1, // Rollback action ID
+            "Step rollback: " + rollbackReason,
+            "ROLLBACK",
+            "Alert",
+            alertId,
+            mongoAlert.getAlertStepId(),
+            previousStepId
+         );
+         
+         log.info("Successfully rolled back alertId: {} to step: {}", alertId, stepId);
+         return rolledBackAlert;
+         
+      } catch (NumberFormatException e) {
+         log.error("Invalid step ID format during rollback for alertId: {}", alertId, e);
+         throw new CaisIllegalArgumentException("Invalid step ID format: " + e.getMessage());
+      } catch (Exception e) {
+         log.error("Failed to rollback step for alertId: {}", alertId, e);
+         throw new RuntimeException("Failed to rollback step", e);
+      }
+   }
+   
+   @Transactional
+   public Alert rollbackStepWithAudit(String alertId, String rollbackReason, AuditLogRequest auditLogRequest) {
+      Alert oldAlert = getAlertOnId(alertId);
+      Alert rolledBackAlert = rollbackStep(alertId, rollbackReason);
+      
+      auditLogRequest.setAffectedItemType("Alert");
+      auditLogRequest.setAffectedItemId(alertId);
+      auditLogRequest.setOldValue(oldAlert.getAlertStepName());
+      auditLogRequest.setNewValue(rolledBackAlert.getAlertStepName());
+      auditLogRequest.setDescription("Step rollback: " + rollbackReason);
+      
+      auditTrailService.logAction(
+         auditLogRequest.getUserId(),
+         auditLogRequest.getUserRole(),
+         auditLogRequest.getActionId(),
+         auditLogRequest.getDescription(),
+         auditLogRequest.getCategory(),
+         auditLogRequest.getAffectedItemType(),
+         auditLogRequest.getAffectedItemId(),
+         auditLogRequest.getOldValue(),
+         auditLogRequest.getNewValue()
+      );
+      
+      return rolledBackAlert;
+   }
+   
+   /**
+    * Find the previous step from audit trail
+    */
+   private String findPreviousStepFromAudit(String alertId) {
+      try {
+         Query query = new Query(Criteria.where("affectedItemId").is(alertId)
+            .and("affectedItemType").is("Alert")
+            .and("description").regex(".*step.*", "i"))
+            .with(org.springframework.data.domain.Sort.by(
+               org.springframework.data.domain.Sort.Direction.DESC, "actionTimestamp"))
+            .limit(2); // Get last 2 step changes
+         
+         List<Map> rawRecords = mongoTemplate.find(query, Map.class, "cm_audit_trail");
+         @SuppressWarnings("unchecked")
+         List<Map<String, Object>> auditRecords = (List<Map<String, Object>>) (List<?>) rawRecords;
+         
+         if (auditRecords.size() < 2) {
+            log.warn("Insufficient audit history for rollback. Found {} records", auditRecords.size());
+            return null;
+         }
+         
+         // Return the old value from the second-to-last record (which is the previous step)
+         Map<String, Object> previousRecord = auditRecords.get(1);
+         String oldValue = (String) previousRecord.get("oldValue");
+         
+         // Try to extract step ID from old value
+         if (oldValue != null && oldValue.matches("\\d+")) {
+            return oldValue;
+         }
+         
+         log.warn("Could not extract valid step ID from audit record: {}", oldValue);
+         return null;
+         
+      } catch (Exception e) {
+         log.error("Error finding previous step from audit for alertId: {}", alertId, e);
+         return null;
+      }
+   }
+
+   @Transactional
+   public BulkStepChangeResponse changeStepBulk(BulkStepChangeRequest request) {
+      log.info("Starting bulk step change for {} alerts to step {}", 
+              request.getAlertIds().size(), request.getStepId());
+      
+      BulkStepChangeResponse response = new BulkStepChangeResponse();
+      response.setTotalRequested(request.getAlertIds().size());
+      response.setSuccessfulAlertIds(new ArrayList<>());
+      response.setFailedAlerts(new HashMap<>());
+      response.setValidationErrors(new ArrayList<>());
+      
+      // Validate step exists
+      Step step = stepsRepository.findByStepId(request.getStepId());
+      if (step == null) {
+         response.getValidationErrors().add("Step not found with id: " + request.getStepId());
+         response.setFailureCount(request.getAlertIds().size());
+         response.setSuccessCount(0);
+         return response;
+      }
+      
+      // Process each alert
+      for (String alertId : request.getAlertIds()) {
+         try {
+            // Validate alert exists
+            Alert alert = getAlertOnId(alertId);
+            if (alert == null) {
+               response.getFailedAlerts().put(alertId, "Alert not found");
+               continue;
+            }
+            
+            // Skip validation if requested
+            if (!request.isSkipValidation()) {
+               Long currentStepId = alert.getAlertStepId() != null ? Long.parseLong(alert.getAlertStepId()) : null;
+               if (!validateStepTransition(alertId, currentStepId, request.getStepId())) {
+                  response.getFailedAlerts().put(alertId, "Step transition not allowed");
+                  continue;
+               }
+            }
+            
+            // Change step
+            Alert updatedAlert = changeStep(alertId, request.getStepId(), null);
+            response.getSuccessfulAlertIds().add(alertId);
+            
+            log.debug("Successfully changed step for alert: {} to step: {}", alertId, request.getStepId());
+            
+         } catch (Exception e) {
+            log.error("Failed to change step for alert: {}", alertId, e);
+            response.getFailedAlerts().put(alertId, e.getMessage());
+         }
+      }
+      
+      response.setSuccessCount(response.getSuccessfulAlertIds().size());
+      response.setFailureCount(response.getFailedAlerts().size());
+      
+      log.info("Bulk step change completed: {} successful, {} failed out of {} total", 
+              response.getSuccessCount(), response.getFailureCount(), response.getTotalRequested());
+      
+      return response;
+   }
+   
+   @Transactional
+   public BulkStepChangeResponse changeStepBulkWithAudit(BulkStepChangeRequest request, AuditLogRequest auditLogRequest) {
+      log.info("Starting bulk step change with audit for {} alerts to step {}", 
+              request.getAlertIds().size(), request.getStepId());
+      
+      LocalDateTime bulkOperationStartTime = LocalDateTime.now();
+      BulkStepChangeResponse response = changeStepBulk(request);
+      LocalDateTime bulkOperationEndTime = LocalDateTime.now();
+      
+      // Enhanced bulk operation audit
+      try {
+         Map<String, Object> bulkOperationDetails = new HashMap<>();
+         bulkOperationDetails.put("requestedAlerts", request.getAlertIds());
+         bulkOperationDetails.put("targetStepId", request.getStepId());
+         bulkOperationDetails.put("successfulAlerts", response.getSuccessfulAlertIds());
+         bulkOperationDetails.put("failedAlerts", response.getFailedAlerts());
+         bulkOperationDetails.put("operationStartTime", bulkOperationStartTime.toString());
+         bulkOperationDetails.put("operationEndTime", bulkOperationEndTime.toString());
+         bulkOperationDetails.put("operationDurationMs", 
+                 java.time.Duration.between(bulkOperationStartTime, bulkOperationEndTime).toMillis());
+         bulkOperationDetails.put("reason", request.getReason());
+         bulkOperationDetails.put("skipValidation", request.isSkipValidation());
+         
+         String detailsJson = objectMapper.writeValueAsString(bulkOperationDetails);
+         
+         // Log bulk operation audit
+         auditLogRequest.setAffectedItemType("Alert");
+         auditLogRequest.setDescription("Bulk step change to step: " + request.getStepId());
+         auditTrailService.logAction(
+                 auditLogRequest.getUserId(),
+                 auditLogRequest.getUserRole(),
+                 auditLogRequest.getActionId(),
+                 auditLogRequest.getDescription(),
+                 auditLogRequest.getCategory(),
+                 auditLogRequest.getAffectedItemType(),
+                 null,
+                 null,
+                 detailsJson
+         );
+         
+      } catch (Exception e) {
+         log.error("Error creating enhanced bulk operation audit log", e);
+         // Fallback to basic audit logging
+         auditLogRequest.setAffectedItemType("Alert");
+         auditLogRequest.setDescription("Bulk step change to step: " + request.getStepId());
+         auditTrailService.logAction(
+                 auditLogRequest.getUserId(),
+                 auditLogRequest.getUserRole(),
+                 auditLogRequest.getActionId(),
+                 auditLogRequest.getDescription(),
+                 auditLogRequest.getCategory(),
+                 auditLogRequest.getAffectedItemType(),
+                 null,
+                 null,
+                 String.format("Bulk operation: %d successful, %d failed, Reason: %s", 
+                         response.getSuccessCount(), response.getFailureCount(), 
+                         request.getReason() != null ? request.getReason() : "Not specified")
+         );
+      }
+      
+      return response;
+   }
+
+   /**
+    * Validates if a step transition is allowed based on workflow configuration
+    */
+   private boolean validateStepTransition(String alertId, Long currentStepId, Long targetStepId) {
+      try {
+         // If no current step (initial state), allow any step
+         if (currentStepId == null) {
+            return true;
+         }
+         
+         Alert alert = getAlertOnId(alertId);
+         if (alert.getAlertTypeId() == null) {
+            log.warn("Alert {} has no alert type, allowing step transition", alertId);
+            return true;
+         }
+         
+         AlertTypeExtended alertType = alertTypeServiceExtended.getAlertTypeFields(alert.getAlertTypeId());
+         if (alertType == null || alertType.getWorkflowId() == null) {
+            log.warn("Alert type {} has no workflow, allowing step transition", alert.getAlertTypeId());
+            return true;
+         }
+         
+         Long workflowId = Long.valueOf(alertType.getWorkflowId());
+         
+         // Check if transition exists in workflow_transition table
+         Optional<WorkflowTransitionEntity> transitionOpt = workflowTransitionRepository
+                 .findByWorkflowWorkflowIdAndSourceStepWorkflowStepIdAndTargetStepWorkflowStepId(
+                         workflowId, currentStepId, targetStepId);
+         
+         return transitionOpt.isPresent();
+         
+      } catch (Exception e) {
+         log.error("Error validating step transition for alert {}: {}", alertId, e.getMessage());
+         return false;
+      }
+   }
+
+   @Transactional
    public Alert unassignUserFromAlert(String alertId) {
       log.debug("Starting synchronized ownerId update for alertId: {}", alertId);
 
@@ -720,47 +1007,125 @@ public class AlertService {
 
 
    @Transactional
-   public  Alert changeStep(String alertId, Long stepId)  {
-      log.debug("Starting synchronized  change step update for alertId: {}", alertId);
+   public Alert changeStep(String alertId, Long stepId, String userId) {
+      log.info("Starting step change for alertId: {} from userId: {} to stepId: {}", alertId, userId, stepId);
+      
+      LocalDateTime operationStartTime = LocalDateTime.now();
+      
       try {
-
-         // First check if record exists in both DBs
-
+         // 1. Validate alert exists in both databases
          AlertEntity mongoAlert = alertRepository.findByAlertId(alertId);
-         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
-                 .orElseThrow(() -> new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId));
-
          if (mongoAlert == null) {
+            log.error("Alert not found in MongoDB: {}", alertId);
             throw new CaisNotFoundException("Alert not found in MongoDB with id: " + alertId);
          }
-
+         
+         RdbmsAlertEntity rdbmsAlert = rdbmsAlertRepository.findByAlertId(alertId)
+                 .orElseThrow(() -> {
+                    log.error("Alert not found in RDBMS: {}", alertId);
+                    return new CaisNotFoundException("Alert not found in RDBMS with id: " + alertId);
+                 });
+         
+         // 2. Validate step exists
          Step step = stepsRepository.findByStepId(stepId);
          if (step == null) {
+            log.error("Step not found: {}", stepId);
             throw new CaisNotFoundException("Step not found with id: " + stepId);
          }
-
+         
          StepStatus stepStatus = stepStatusRepository.findByStepStatusId(step.getStepStatusId());
          if (stepStatus == null) {
+            log.error("Step status not found for stepId: {}", stepId);
             throw new CaisNotFoundException("Step status not found for step id: " + stepId);
          }
-
-         String StepName = step.getStepName();
-         String Status = stepStatus.getStepName();
-
-
-
-         Query query = null;
-         query = new Query(Criteria.where("alertId").is(alertId));
-         // Update MongoDB
-
+         
+         Long currentStepId = mongoAlert.getAlertStepId() != null ? Long.parseLong(mongoAlert.getAlertStepId()) : null;
+         log.debug("Transitioning alert {} from step {} to step {}", alertId, currentStepId, stepId);
+         
+         // 3. Validate step transition is allowed
+         if (!validateStepTransition(alertId, currentStepId, stepId)) {
+            log.warn("Step transition not allowed: {} -> {} for alert {}", currentStepId, stepId, alertId);
+            throw new AlertOperationException("Step transition not allowed from step " + currentStepId + " to step " + stepId);
+         }
+         
+         // 4. Check user permissions for step transition
+         if (userId != null && !stepPermissionService.hasStepTransitionPermission(userId, alertId, currentStepId, stepId)) {
+            log.warn("User {} lacks permission for step transition {} -> {} on alert {}", userId, currentStepId, stepId, alertId);
+            throw new AlertOperationException("User " + userId + " does not have permission to transition from step " + currentStepId + " to step " + stepId);
+         }
+         
+         // 5. Validate business rules and prerequisites
+         Alert currentAlert = alertMapper.toModel(mongoAlert);
+         if (currentAlert.getAlertTypeId() != null) {
+            AlertTypeExtended alertType = alertTypeServiceExtended.getAlertTypeFields(currentAlert.getAlertTypeId());
+            if (alertType != null && alertType.getWorkflowId() != null) {
+               Long workflowId = Long.valueOf(alertType.getWorkflowId());
+               log.debug("Validating workflow rules for workflowId: {}", workflowId);
+               
+               WorkflowRuleEngine.ValidationResult ruleResult = workflowRuleEngine.validateTransitionRules(
+                       workflowId, currentStepId, stepId, currentAlert);
+               
+               if (!ruleResult.isValid()) {
+                  log.warn("Business rule validation failed for alert {}: {}", alertId, ruleResult.getErrorMessage());
+                  throw new AlertOperationException("Business rule validation failed: " + ruleResult.getErrorMessage());
+               }
+               log.debug("Business rule validation passed for alert: {}", alertId);
+            }
+         }
+         
+         // 6. Check for auto-assignment rules
+         // TODO: Uncomment when StepAssignmentService is implemented
+         String assignedUserId = null; // stepAssignmentService.getAssignedUser(stepId, mongoAlert.getOrgUnitId(), alertId);
+         boolean shouldUpdateOwner = assignedUserId != null && !assignedUserId.equals(mongoAlert.getOwnerId());
+         
+         // Cache user lookup to avoid redundant DB calls
+         UserEntity assignedUser = null;
+         if (shouldUpdateOwner) {
+            assignedUser = userRepository.findById(assignedUserId).orElse(null);
+            if (assignedUser == null) {
+               log.warn("Assigned user not found: {}, skipping auto-assignment for alert: {}", assignedUserId, alertId);
+               shouldUpdateOwner = false;
+            } else {
+               log.info("Auto-assigning alert {} to user {} based on step assignment rules", alertId, assignedUserId);
+            }
+         }
+         
+         String stepName = step.getStepName();
+         String status = stepStatus.getStepName();
+         
+         if (stepName == null || status == null) {
+            log.error("Invalid step data: stepName={}, status={} for stepId: {}", stepName, status, stepId);
+            throw new AlertOperationException("Invalid step configuration for step ID: " + stepId);
+         }
+         
+         // 7. Calculate new deadline based on SLA rules
+         LocalDateTime newDeadline = stepSlaService.calculateStepDeadline(stepId, mongoAlert.getAlertTypeId());
+         log.debug("Calculated new deadline for alertId: {}, stepId: {}, deadline: {}", alertId, stepId, newDeadline);
+         
+         // Check for SLA violations
+         if (stepSlaService.hasSlaViolation(newDeadline)) {
+            log.warn("SLA violation detected for alert {} at step {}", alertId, stepId);
+         } else if (stepSlaService.isApproachingSlaViolation(newDeadline)) {
+            log.warn("SLA approaching violation for alert {} at step {}", alertId, stepId);
+         }
+         
+         // 8. Update MongoDB
+         Query query = new Query(Criteria.where("alertId").is(alertId));
          Update update = new Update();
-         update.set("alertStepName", StepName);
+         update.set("alertStepName", stepName);
          update.set("alertStepId", stepId);
-         update.set("status", Status);
-         update.set("lastStepUpdatedDate" , LocalDateTime.now().toString());
+         update.set("status", status);
+         update.set("deadline", newDeadline.toLocalDate());
+         update.set("lastStepUpdatedDate", LocalDateTime.now().toString());
          update.set("lastUpdateDate", LocalDateTime.now().toString());
-
-
+         
+         // Auto-assign owner if rule exists
+         if (shouldUpdateOwner && assignedUser != null) {
+            update.set("ownerId", assignedUserId);
+            update.set("ownerName", assignedUser.getUserLoginName());
+            log.debug("Updated owner to {} for alert {}", assignedUser.getUserLoginName(), alertId);
+         }
+         
          AlertEntity updatedMongoAlert = mongoTemplate.findAndModify(
                  query,
                  update,
@@ -768,48 +1133,124 @@ public class AlertService {
                  AlertEntity.class,
                  CaisAlertConstants.ALERTS
          );
-
+         
          if (updatedMongoAlert == null) {
-            throw new CaisNotFoundException("Failed to update MongoDB alert with id: " + alertId);
+            log.error("Failed to update MongoDB alert: {}", alertId);
+            throw new AlertOperationException("Failed to update MongoDB alert with id: " + alertId);
          }
-
-         // Update PostgreSQL
-         rdbmsAlert.setStatus(Status);
+         
+         // 9. Update PostgreSQL
+         rdbmsAlert.setStatus(status);
          rdbmsAlert.setAlertStepId(String.valueOf(stepId));
-         rdbmsAlert.setAlertStepName(StepName);
+         rdbmsAlert.setAlertStepName(stepName);
+         // TODO: Add setDeadline method to RdbmsAlertEntity or use different field
+         // rdbmsAlert.setDeadline(newDeadline.toLocalDate());
          rdbmsAlert.setLastUpdateDate(LocalDateTime.now());
          rdbmsAlert.setLastStepUpdatedDate(LocalDateTime.now());
-//         rdbmsAlert.setDueDate(LocalDateTime.now()+10);
-
-
-         RdbmsAlertEntity savedRdbmsAlert = rdbmsAlertRepository.save(rdbmsAlert);
-         log.info("Successfully updated step in both databases for alertId: {}", alertId);
-
+         
+         if (shouldUpdateOwner && assignedUser != null) {
+            rdbmsAlert.setOwnerId(assignedUserId);
+            rdbmsAlert.setOwnerName(assignedUser.getUserLoginName());
+         }
+         
+         rdbmsAlertRepository.save(rdbmsAlert);
+         
+         LocalDateTime operationEndTime = LocalDateTime.now();
+         long operationDurationMs = java.time.Duration.between(operationStartTime, operationEndTime).toMillis();
+         
+         log.info("Successfully updated step in both databases for alertId: {} in {}ms", alertId, operationDurationMs);
+         
+         // 10. Capture notification data before async execution to avoid data race
+         final String finalStepName = stepName;
+         final String finalPreviousStepName;
+         if (currentStepId != null) {
+            Step previousStep = stepsRepository.findByStepId(currentStepId);
+            finalPreviousStepName = previousStep != null ? previousStep.getStepName() : "Initial";
+         } else {
+            finalPreviousStepName = "Initial";
+         }
+         final long finalOperationDurationMs = operationDurationMs;
+         final String finalAssignedUserId = assignedUserId;
+         final boolean finalShouldUpdateOwner = shouldUpdateOwner;
+         final String finalNewDeadline = newDeadline.toString();
+         
+         // TODO: Uncomment when AsyncNotificationService is implemented
+         // Send notifications asynchronously using separate service
+         // asyncNotificationService.sendStepChangeNotifications(alertId, finalPreviousStepName, finalStepName, userId, 
+         //        finalOperationDurationMs, finalNewDeadline, finalShouldUpdateOwner, finalAssignedUserId);
+         
          return alertMapper.toModel(updatedMongoAlert);
+         
+      } catch (AlertOperationException | CaisNotFoundException e) {
+         log.error("Step change validation failed for alertId: {}, stepId: {}: {}", alertId, stepId, e.getMessage());
+         throw e;
       } catch (Exception e) {
-         log.error("Failed to update step for alertId: {}. Rolling back both databases.", alertId, e);
+         log.error("Unexpected error during step change for alertId: {}, stepId: {}", alertId, stepId, e);
          TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-         throw new RuntimeException("Failed to update osteprgId in databases", e);
+         throw new AlertOperationException("Failed to update step in databases: " + e.getMessage(), e);
       }
    }
    @Transactional
    public Alert changeStepWithAudit(String alertId, Long stepId, AuditLogRequest auditLogRequest) {
       Alert oldAlert = getAlertOnId(alertId);
-      Alert updatedAlert = changeStep(alertId, stepId);
+      LocalDateTime transitionStartTime = LocalDateTime.now();
+      
+      Alert updatedAlert = changeStep(alertId, stepId, String.valueOf(auditLogRequest.getUserId()));
+      
+      LocalDateTime transitionEndTime = LocalDateTime.now();
 
-      auditLogRequest.setAffectedItemType("Alert");
-      auditLogRequest.setAffectedItemId(alertId);
-      auditLogRequest.setOldValue(oldAlert.getAlertStepName());
-      auditLogRequest.setNewValue(updatedAlert.getAlertStepName());
-      auditTrailService.logAction(auditLogRequest.getUserId(),
-              auditLogRequest.getUserRole(),
-              auditLogRequest.getActionId(),
-              auditLogRequest.getDescription(),
-              auditLogRequest.getCategory(),
-              auditLogRequest.getAffectedItemType(),
-              auditLogRequest.getAffectedItemId(),
-              auditLogRequest.getOldValue(),
-              auditLogRequest.getNewValue());
+      // Enhanced audit logging with step transition details
+      try {
+         Map<String, Object> stepTransitionDetails = new HashMap<>();
+         stepTransitionDetails.put("previousStepId", oldAlert.getAlertStepId());
+         stepTransitionDetails.put("previousStepName", oldAlert.getAlertStepName());
+         stepTransitionDetails.put("newStepId", stepId.toString());
+         stepTransitionDetails.put("newStepName", updatedAlert.getAlertStepName());
+         stepTransitionDetails.put("transitionStartTime", transitionStartTime.toString());
+         stepTransitionDetails.put("transitionEndTime", transitionEndTime.toString());
+         stepTransitionDetails.put("transitionDurationMs", 
+                 java.time.Duration.between(transitionStartTime, transitionEndTime).toMillis());
+         stepTransitionDetails.put("userId", auditLogRequest.getUserId());
+         stepTransitionDetails.put("userRole", auditLogRequest.getUserRole());
+         stepTransitionDetails.put("alertTotalScore", updatedAlert.getTotalScore());
+         stepTransitionDetails.put("alertOwner", updatedAlert.getOwnerId());
+         
+         String detailsJson = objectMapper.writeValueAsString(stepTransitionDetails);
+         
+         auditLogRequest.setAffectedItemType("Alert");
+         auditLogRequest.setAffectedItemId(alertId);
+         auditLogRequest.setOldValue(oldAlert.getAlertStepName());
+         auditLogRequest.setNewValue(updatedAlert.getAlertStepName());
+         auditLogRequest.setDescription("Step transition: " + oldAlert.getAlertStepName() + " → " + updatedAlert.getAlertStepName());
+         
+         // Log with enhanced details
+         auditTrailService.logAction(auditLogRequest.getUserId(),
+                 auditLogRequest.getUserRole(),
+                 auditLogRequest.getActionId(),
+                 auditLogRequest.getDescription(),
+                 auditLogRequest.getCategory(),
+                 auditLogRequest.getAffectedItemType(),
+                 auditLogRequest.getAffectedItemId(),
+                 auditLogRequest.getOldValue(),
+                 detailsJson); // Use detailed JSON instead of just new value
+         
+      } catch (Exception e) {
+         log.error("Error creating enhanced audit log for step transition", e);
+         // Fallback to basic audit logging
+         auditLogRequest.setAffectedItemType("Alert");
+         auditLogRequest.setAffectedItemId(alertId);
+         auditLogRequest.setOldValue(oldAlert.getAlertStepName());
+         auditLogRequest.setNewValue(updatedAlert.getAlertStepName());
+         auditTrailService.logAction(auditLogRequest.getUserId(),
+                 auditLogRequest.getUserRole(),
+                 auditLogRequest.getActionId(),
+                 auditLogRequest.getDescription(),
+                 auditLogRequest.getCategory(),
+                 auditLogRequest.getAffectedItemType(),
+                 auditLogRequest.getAffectedItemId(),
+                 auditLogRequest.getOldValue(),
+                 auditLogRequest.getNewValue());
+      }
 
       return updatedAlert;
    }
@@ -1336,6 +1777,7 @@ public class AlertService {
       // Convert and return the workflow ID
       return Long.valueOf(wfId);
    }
+
 }
 
 

@@ -1,6 +1,7 @@
 package com.dair.cais.note;
 
 import com.dair.exception.CaisBaseException;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -19,6 +20,7 @@ import java.util.Optional;
 import static com.dair.cais.common.config.CaisAlertConstants.MONGO_COLLECTION_ALERT_NOTES;
 
 @Repository
+@Slf4j
 public class NoteRepository {
 
     @Autowired
@@ -34,14 +36,14 @@ public class NoteRepository {
 
     public NoteEntityExtended addNote(String note, String alertId, String createdBy, String entity, String entityValue) {
         NoteEntityExtended finalentity = noteMapperExtended.toEntity(note, alertId, createdBy, entity, entityValue);
-        NoteEntityExtended alEntity = mongoTemplate.save(finalentity, "notes");
+        NoteEntityExtended alEntity = mongoTemplate.save(finalentity, MONGO_COLLECTION_ALERT_NOTES);
         return alEntity;
     }
 
     public List<NoteExtended> findByAlertId(String alertId) {
         Query query = new Query();
         query.addCriteria(Criteria.where("alertId").is(alertId));
-        List<NoteEntityExtended> noteEntities = mongoTemplate.find(query, NoteEntityExtended.class, "notes");
+        List<NoteEntityExtended> noteEntities = mongoTemplate.find(query, NoteEntityExtended.class, MONGO_COLLECTION_ALERT_NOTES);
         return noteMapperExtended.toModel(noteEntities);
     }
 
@@ -57,11 +59,11 @@ public class NoteRepository {
                 if (fieldValue.isPresent()
                         && field.getName() != "serialVersionUID"
                         && field.getName() != "id") {
-                    System.out.println(field.getName() + ": " + fieldValue.get());
+                    log.debug("Updating field {}: {}", field.getName(), fieldValue.get());
                     update.set(field.getName(), fieldValue.get());
                 }
             } catch (IllegalArgumentException | IllegalAccessException e) {
-                e.printStackTrace();
+                log.error("Error accessing field {}: {}", field.getName(), e.getMessage());
             }
         }
 

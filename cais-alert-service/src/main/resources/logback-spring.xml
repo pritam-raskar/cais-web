@@ -73,8 +73,19 @@
 
     <!-- Application loggers -->
     <logger name="com.dair.cais" level="DEBUG"/>
-
+    
+    <!-- Step Management loggers -->
+    <logger name="com.dair.cais.alert.AlertService" level="INFO"/>
+    <logger name="com.dair.cais.workflow.engine.WorkflowRuleEngine" level="INFO"/>
+    <logger name="com.dair.cais.steps.permission.StepPermissionService" level="INFO"/>
+    <logger name="com.dair.cais.steps.assignment.StepAssignmentService" level="INFO"/>
+    <logger name="com.dair.cais.steps.notification.StepNotificationService" level="INFO"/>
+    <logger name="com.dair.cais.sla.StepSlaService" level="INFO"/>
+    
     <!-- Security related loggers -->
     <logger name="org.springframework.security" level="WARN"/>
     <logger name="org.springframework.web" level="WARN"/>
+    
+    <!-- Audit trail logger -->
+    <logger name="com.dair.cais.audit.AuditTrailService" level="INFO"/>
 </configuration>

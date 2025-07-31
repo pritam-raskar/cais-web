@@ -1,6 +1,8 @@
 package com.dair.cais.exception;
 
 import com.dair.cais.alert.exception.AlertOperationException;
+import com.dair.cais.attachment.exception.AttachmentException;
+import com.dair.cais.note.exception.NoteException;
 import com.dair.cais.reports.exception.ReportRetrievalException;
 import com.dair.cais.steps.exception.StepNameAlreadyExistsException;
 import com.dair.cais.steps.exception.StepNotFoundException;
@@ -221,5 +223,105 @@ public class GlobalExceptionHandler {
                 ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    @ExceptionHandler(AttachmentException.class)
+    public ResponseEntity<Map<String, String>> handleAttachmentException(AttachmentException ex) {
+        log.error("Attachment operation failed: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(NoteException.class)
+    public ResponseEntity<Map<String, String>> handleNoteException(NoteException ex) {
+        log.error("Note operation failed: {}", ex.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    
+    /**
+     * Handles step transition validation errors
+     */
+    @ExceptionHandler(com.dair.cais.alert.exception.AlertValidationException.class)
+    public ResponseEntity<Object> handleAlertValidationException(
+            com.dair.cais.alert.exception.AlertValidationException ex,
+            WebRequest request) {
+        log.warn("Alert validation failed: {}", ex.getMessage());
+        
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Validation Error");
+        body.put("message", ex.getMessage());
+        body.put("validationErrors", ex.getErrors());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+    
+    /**
+     * Handles permission denied errors
+     */
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Object> handleSecurityException(
+            SecurityException ex,
+            WebRequest request) {
+        log.warn("Security/Permission error: {}", ex.getMessage());
+        
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("error", "Permission Denied");
+        body.put("message", "You do not have permission to perform this operation");
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+    
+    /**
+     * Handles unexpected application errors (excluding framework/system errors)
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Object> handleApplicationException(
+            RuntimeException ex,
+            WebRequest request) {
+        // Only handle application-level runtime exceptions
+        // Let framework exceptions bubble up to container
+        if (isFrameworkException(ex)) {
+            throw ex; // Re-throw framework exceptions
+        }
+        
+        log.error("Application error occurred: {}", ex.getClass().getSimpleName(), ex);
+        
+        String message = "An application error occurred. Please contact system administrator.";
+        String errorCode = "APPLICATION_ERROR";
+        
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", errorCode);
+        body.put("message", message);
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+    
+    /**
+     * Check if exception is a framework/system exception that should bubble up
+     */
+    private boolean isFrameworkException(RuntimeException ex) {
+        String className = ex.getClass().getName();
+        return className.startsWith("org.springframework.beans.") ||
+               className.startsWith("org.springframework.boot.") ||
+               className.startsWith("org.springframework.context.") ||
+               className.startsWith("org.springframework.dao.") ||
+               className.startsWith("org.springframework.transaction.") ||
+               className.startsWith("org.hibernate.") ||
+               className.startsWith("javax.persistence.") ||
+               className.startsWith("jakarta.persistence.") ||
+               className.startsWith("java.lang.OutOfMemoryError") ||
+               className.startsWith("java.lang.StackOverflowError");
     }
 }

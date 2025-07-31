@@ -72,16 +72,19 @@ logging:
 
 # Storage Configuration
 storage:
-  type: ${STORAGE_TYPE:local}
+  type: ${STORAGE_TYPE:s3}
   location: ${STORAGE_LOCATION:/tmp/storage}
   s3:
-    bucket-name: ${S3_BUCKET_NAME:your-bucket-name}
+    bucket-name: ${S3_BUCKET_NAME:alert-attachements}
 
 # AWS Configuration
 cloud:
   aws:
     region:
       static: ${AWS_REGION:us-east-1}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
     stack:
       auto: false
 

@@ -1,5 +1,7 @@
 package com.dair.cais.alert;
 
+import com.dair.cais.alert.dto.BulkStepChangeRequest;
+import com.dair.cais.alert.dto.BulkStepChangeResponse;
 import com.dair.cais.alert.dto.StepTransitionDTO;
 import com.dair.cais.alert.exception.AlertOperationException;
 import com.dair.cais.alert.exception.AlertValidationException;
@@ -21,6 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -36,6 +41,27 @@ import java.util.Map;
 @Slf4j
 public class AlertController {
     private final AlertService alertService;
+    
+    /**
+     * Extracts user ID from authentication context
+     */
+    private String getCurrentUserId() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
+                return ((UserDetails) authentication.getPrincipal()).getUsername();
+            }
+            if (authentication != null && authentication.getName() != null) {
+                return authentication.getName();
+            }
+            throw new SecurityException("No authenticated user found");
+        } catch (SecurityException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Authentication context error", e);
+            throw new SecurityException("Authentication failed");
+        }
+    }
 
     @GetMapping("/active")
     @Operation(summary = "Get all active alerts")
@@ -244,9 +270,10 @@ public class AlertController {
     @Operation(summary = "Change alert step")
     public ResponseEntity<Alert> changeStep(
             @PathVariable String alertId,
-            @RequestParam Long stepId) {
-        log.debug("Request received to change step for alert: {}", alertId);
-        return ResponseEntity.ok(alertService.changeStep(alertId, stepId));
+            @RequestParam Long stepId,
+            @RequestParam(required = false) String userId) {
+        log.debug("Request received to change step for alert: {} by user: {}", alertId, userId);
+        return ResponseEntity.ok(alertService.changeStep(alertId, stepId, userId));
     }
 
     @PatchMapping(value = "/audit/changestep/{alertId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -257,6 +284,57 @@ public class AlertController {
             @RequestBody AuditLogRequest auditLogRequest) {
         log.debug("Request received to change step for alert: {} with audit", alertId);
         return ResponseEntity.ok(alertService.changeStepWithAudit(alertId, stepId, auditLogRequest));
+    }
+
+    @PostMapping("/bulk/step-change")
+    @Operation(summary = "Change steps for multiple alerts",
+            description = "Bulk operation to change steps for multiple alerts with individual validation")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Bulk operation completed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<BulkStepChangeResponse> bulkStepChange(
+            @Valid @RequestBody BulkStepChangeRequest request) {
+        log.debug("Request received for bulk step change: {} alerts to step {}", 
+                request.getAlertIds().size(), request.getStepId());
+        
+        BulkStepChangeResponse response = alertService.changeStepBulk(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/audit/bulk/step-change")
+    @Operation(summary = "Change steps for multiple alerts with audit",
+            description = "Bulk operation to change steps for multiple alerts with audit logging")
+    public ResponseEntity<BulkStepChangeResponse> bulkStepChangeWithAudit(
+            @Valid @RequestBody BulkStepChangeRequest request,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received for bulk step change with audit: {} alerts to step {}", 
+                request.getAlertIds().size(), request.getStepId());
+        
+        BulkStepChangeResponse response = alertService.changeStepBulkWithAudit(request, auditLogRequest);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/rollback/{alertId}")
+    @Operation(summary = "Rollback alert to previous step")
+    public ResponseEntity<Alert> rollbackStep(
+            @PathVariable String alertId,
+            @RequestParam("reason") String rollbackReason) {
+        log.debug("Request received to rollback step for alert: {}", alertId);
+        return ResponseEntity.ok(alertService.rollbackStep(alertId, rollbackReason));
+    }
+
+    @PatchMapping(value = "/audit/rollback/{alertId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Rollback alert to previous step with audit")
+    public ResponseEntity<Alert> rollbackStepWithAudit(
+            @PathVariable String alertId,
+            @RequestParam("reason") String rollbackReason,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.debug("Request received to rollback step for alert: {} with audit", alertId);
+        return ResponseEntity.ok(alertService.rollbackStepWithAudit(alertId, rollbackReason, auditLogRequest));
     }
 
     @GetMapping("")
@@ -456,4 +534,68 @@ public class AlertController {
 
         return ResponseEntity.ok(transitions);
     }*/
+    
+    @PostMapping("/bulk/change-step")
+    @Operation(summary = "Change step for multiple alerts",
+            description = "Performs bulk step change operation for multiple alerts with validation")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Bulk step change completed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<BulkStepChangeResponse> changeStepBulk(
+            @Parameter(description = "Bulk step change request", required = true)
+            @Valid @RequestBody BulkStepChangeRequest request) {
+        String currentUserId = getCurrentUserId();
+        log.info("REST request for bulk step change by user {}: {} alerts to step {}", 
+                currentUserId, request.getAlertIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = alertService.changeStepBulk(request);
+            log.info("Bulk step change completed by user {}: {} successful, {} failed", 
+                    currentUserId, response.getSuccessCount(), response.getFailureCount());
+            return ResponseEntity.ok(response);
+        } catch (AlertValidationException e) {
+            log.error("Bulk step change validation failed for user {}: {}", currentUserId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error during bulk step change operation for user {}", currentUserId, e);
+            throw new AlertOperationException("Bulk step change operation failed: " + e.getMessage(), e);
+        }
+    }
+    
+    @PostMapping("/audit/bulk/change-step")
+    @Operation(summary = "Change step for multiple alerts with audit",
+            description = "Performs bulk step change operation with comprehensive audit logging")
+    public ResponseEntity<BulkStepChangeResponse> changeStepBulkWithAudit(
+            @Valid @RequestBody BulkStepChangeRequest request,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        String currentUserId = getCurrentUserId();
+        // Set user context in audit request
+        auditLogRequest.setUserId(Long.valueOf(currentUserId));
+        
+        log.info("REST request for bulk step change with audit by user {}: {} alerts to step {}", 
+                currentUserId, request.getAlertIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = alertService.changeStepBulkWithAudit(request, auditLogRequest);
+            log.info("Bulk step change with audit completed by user {}: {} successful, {} failed", 
+                    currentUserId, response.getSuccessCount(), response.getFailureCount());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during bulk step change with audit for user {}", currentUserId, e);
+            throw new AlertOperationException("Bulk step change with audit failed: " + e.getMessage(), e);
+        }
+    }
+    
+    @ExceptionHandler(AlertOperationException.class)
+    public ResponseEntity<ErrorResponse> handleAlertOperationException(AlertOperationException ex) {
+        log.error("Alert operation exception: {}", ex.getMessage(), ex);
+        ErrorResponse error = new ErrorResponse(
+                "ALERT_OPERATION_ERROR",
+                ex.getMessage(),
+                System.currentTimeMillis()
+        );
+        return ResponseEntity.badRequest().body(error);
+    }
 }

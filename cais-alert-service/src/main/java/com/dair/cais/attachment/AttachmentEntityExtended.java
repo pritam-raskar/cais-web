@@ -19,6 +19,8 @@ public class AttachmentEntityExtended implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @MongoId(FieldType.OBJECT_ID)
+    private String id;
+    
     private byte[] fileData; // Binary data of the file
     private String alertId;
     private String fileName;

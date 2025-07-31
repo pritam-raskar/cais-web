@@ -4,14 +4,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
-import java.io.IOException;
+import javax.validation.constraints.NotBlank;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -32,23 +34,14 @@ public class AlertAttachmentController {
    @PostMapping("/upload")
    @Operation(summary = "Add/Upload the attachment")
    public ResponseEntity<ExtendedAttachment> uploadAttachment(
-           @RequestParam("file") MultipartFile file,
-           @PathVariable String alertId,
-           @RequestParam("createdBy") String createdBy,
-           @RequestParam("comment") String comment) {
+           @RequestParam("file") @Valid MultipartFile file,
+           @PathVariable @NotBlank String alertId,
+           @RequestParam("createdBy") @NotBlank String createdBy,
+           @RequestParam("comment") @NotBlank String comment) {
 
-      // Validate the parameters
-      if (file.isEmpty() || alertId == null || createdBy == null || comment == null) {
-         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File, alertId, createdBy, and comment are required.");
-      }
-
-      try {
-         // Call the service to handle the file upload
-         ExtendedAttachment attachment = attachmentService.uploadAttachment(file, alertId, createdBy, comment);
-         return ResponseEntity.status(HttpStatus.CREATED).body(attachment);
-      } catch (IOException e) {
-         throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error processing file upload", e);
-      }
+      // Call the service to handle the file upload
+      ExtendedAttachment attachment = attachmentService.uploadAttachment(file, alertId, createdBy, comment);
+      return ResponseEntity.status(HttpStatus.CREATED).body(attachment);
    }
 
    @GetMapping("/getattachments")
@@ -104,5 +97,40 @@ public class AlertAttachmentController {
       return ResponseEntity.ok()
             .body(attachmentService.getAllAttachments(alertId, name,
                   createdDateFrom, createdDateTo, limit, offset));
+   }
+
+   @GetMapping("/{attachmentId}/download")
+   @Operation(summary = "Download attachment file")
+   public ResponseEntity<byte[]> downloadAttachment(
+           @PathVariable @NotBlank String alertId,
+           @PathVariable @NotBlank String attachmentId) {
+      
+      ExtendedAttachment attachment = attachmentService.downloadAttachment(alertId, attachmentId);
+      
+      HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.parseMediaType(attachment.getFileType()));
+      headers.setContentDispositionFormData("attachment", attachment.getFileName());
+      headers.setContentLength(attachment.getFileSize());
+      
+      return ResponseEntity.ok()
+              .headers(headers)
+              .body(attachment.getFileData());
+   }
+
+   @GetMapping("/downloadAll")
+   @Operation(summary = "Download all attachments as ZIP file")
+   public ResponseEntity<byte[]> downloadAllAttachments(
+           @PathVariable @NotBlank String alertId) {
+      
+      byte[] zipData = attachmentService.downloadAllAttachmentsAsZip(alertId);
+      
+      HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.parseMediaType("application/zip"));
+      headers.setContentDispositionFormData("attachment", "alert-" + alertId + "-attachments.zip");
+      headers.setContentLength(zipData.length);
+      
+      return ResponseEntity.ok()
+              .headers(headers)
+              .body(zipData);
    }
 }

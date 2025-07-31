@@ -1,0 +1,257 @@
+{
+	"info": {
+		"_postman_id": "alert-change-step-collection",
+		"name": "AlertChangeStep",
+		"description": "Collection for CAIS Alert Service step change operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Single Alert Step Changes",
+			"item": [
+				{
+					"name": "Change Alert Step",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Moving to next step\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/changestep/{{alertId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"changestep",
+								"{{alertId}}"
+							]
+						},
+						"description": "Change step for a single alert"
+					}
+				},
+				{
+					"name": "Change Alert Step with Audit",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Moving to next step\",\n  \"auditLog\": {\n    \"action\": \"STEP_CHANGE\",\n    \"description\": \"Step changed via API\",\n    \"userId\": \"user123\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/audit/changestep/{{alertId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"audit",
+								"changestep",
+								"{{alertId}}"
+							]
+						},
+						"description": "Change step for a single alert with audit logging"
+					}
+				}
+			]
+		},
+		{
+			"name": "Bulk Step Changes",
+			"item": [
+				{
+					"name": "Bulk Step Change",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertIds\": [\"{{alertId}}\", \"alert2\", \"alert3\"],\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Bulk step change operation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/bulk/step-change",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"bulk",
+								"step-change"
+							]
+						},
+						"description": "Bulk step change for multiple alerts"
+					}
+				},
+				{
+					"name": "Bulk Step Change with Audit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertIds\": [\"{{alertId}}\", \"alert2\", \"alert3\"],\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Bulk step change operation\",\n  \"auditLog\": {\n    \"action\": \"BULK_STEP_CHANGE\",\n    \"description\": \"Bulk step change via API\",\n    \"userId\": \"user123\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/audit/bulk/step-change",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"audit",
+								"bulk",
+								"step-change"
+							]
+						},
+						"description": "Bulk step change for multiple alerts with audit logging"
+					}
+				},
+				{
+					"name": "Alternative Bulk Change Step",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertIds\": [\"{{alertId}}\", \"alert2\", \"alert3\"],\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Alternative bulk step change\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/bulk/change-step",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"bulk",
+								"change-step"
+							]
+						},
+						"description": "Alternative endpoint for bulk step change"
+					}
+				},
+				{
+					"name": "Alternative Bulk Change Step with Audit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertIds\": [\"{{alertId}}\", \"alert2\", \"alert3\"],\n  \"stepId\": \"{{stepId}}\",\n  \"userId\": \"user123\",\n  \"reason\": \"Alternative bulk step change with audit\",\n  \"auditLog\": {\n    \"action\": \"BULK_STEP_CHANGE\",\n    \"description\": \"Alternative bulk step change via API\",\n    \"userId\": \"user123\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/alerts/audit/bulk/change-step",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"audit",
+								"bulk",
+								"change-step"
+							]
+						},
+						"description": "Alternative endpoint for bulk step change with audit logging"
+					}
+				}
+			]
+		},
+		{
+			"name": "Step Information",
+			"item": [
+				{
+					"name": "Get Alert Step Transitions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/alerts/{{alertId}}/step-transitions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"alerts",
+								"{{alertId}}",
+								"step-transitions"
+							]
+						},
+						"description": "Get available step transitions for a specific alert"
+					}
+				},
+				{
+					"name": "Get Step History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/audit/item/stephistory?alertId={{alertId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"audit",
+								"item",
+								"stephistory"
+							],
+							"query": [
+								{
+									"key": "alertId",
+									"value": "{{alertId}}"
+								}
+							]
+						},
+						"description": "Get step history for audit trail"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8081",
+			"description": "Base URL for the CAIS Alert Service"
+		},
+		{
+			"key": "alertId",
+			"value": "sample-alert-id",
+			"description": "Alert ID for single alert operations"
+		},
+		{
+			"key": "stepId",
+			"value": "sample-step-id",
+			"description": "Target step ID for step change operations"
+		}
+	]
+}

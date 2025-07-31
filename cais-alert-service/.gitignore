@@ -51,6 +51,7 @@ target/
 **/*.class
 
 **/.DS_Store
+../cais-report-service/.DS_Store
 
 # Environment variables and secrets
 .env

@@ -492,10 +492,13 @@ public class AlertController {
         log.info("REST request to get step transitions for alert ID: {}", alertId);
 
         try {
+            log.debug("Calling alertService.getAlertStepTransitions for alertId: {}", alertId);
             StepTransitionDTO transitions = alertService.getAlertStepTransitions(alertId);
+            log.debug("Received transitions: nextSteps={}, backSteps={}", 
+                    transitions.getNextSteps().size(), transitions.getBackSteps().size());
             return ResponseEntity.ok(transitions);
         } catch (EntityNotFoundException e) {
-            log.warn("Alert or workflow not found for alert ID: {}", alertId);
+            log.warn("Alert or workflow not found for alert ID: {}", alertId, e);
             throw e;
         } catch (Exception e) {
             log.error("Error retrieving step transitions for alert ID: {}", alertId, e);

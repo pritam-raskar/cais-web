@@ -3,7 +3,10 @@
     "allow": [
       "Bash(find:*)",
       "Bash(mvn:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(psql:*)",
+      "Bash(docker run:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

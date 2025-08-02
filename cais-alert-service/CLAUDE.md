@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Once you write the plan, firstly ask me to review it. Do not continue until I approve the plan.
 
 ### While implementing
-- You should update the plan as you work.
+- You should update the plan as you work on task.
 - After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
 
 ## Project Overview
@@ -113,3 +113,56 @@ The application runs on port 8081 by default (configurable via PORT environment 
 - Design reports with configurable columns
 - Execute queries against various data sources
 - Export results in multiple formats
+
+### Debug Endpoints for Issue Investigation
+**Note**: These endpoints are for development/debugging only. Remove from production environments.
+
+#### Available Debug Endpoints
+- **GET** `/debug/test-db` - Test PostgreSQL and MongoDB connections
+- **POST** `/debug/sql` - Execute direct SQL queries against PostgreSQL
+- **GET** `/debug/alert/{alertId}` - Get alert details from both databases
+- **POST** `/debug/update-alert-step` - Update alert step IDs in MongoDB
+
+#### Usage Examples
+```bash
+# Test database connections
+curl -X GET "http://localhost:8081/debug/test-db"
+
+# Execute SQL query for workflow investigation
+curl -X POST "http://localhost:8081/debug/sql" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT * FROM info_alert.cm_workflow_step WHERE workflow_id = 104"}'
+
+# Check alert details
+curl -X GET "http://localhost:8081/debug/alert/AccRev_20241120195724_3247548734"
+
+# Update alert step (use carefully)
+curl -X POST "http://localhost:8081/debug/update-alert-step" \
+  -H "Content-Type: application/json" \
+  -d '{"alertId": "AccRev_123", "alertStepId": "17"}'
+```
+
+#### Common Investigation Queries
+```sql
+-- Check workflow transitions for step-transitions debugging
+SELECT * FROM info_alert.cm_workflow_transition 
+WHERE workflow_id = 104 AND source_step_id = 17;
+
+-- Validate alert step consistency
+SELECT a.alert_id, a.alert_step_id, ws.label 
+FROM info_alert.cm_alerts a
+LEFT JOIN info_alert.cm_workflow_step ws ON a.alert_step_id::int = ws.workflow_step_id
+WHERE a.is_active = true AND a.is_deleted = false;
+
+-- Find alerts with invalid workflow step IDs
+SELECT a.alert_id, a.alert_step_id 
+FROM info_alert.cm_alerts a
+LEFT JOIN info_alert.cm_workflow_step ws ON a.alert_step_id::int = ws.workflow_step_id
+WHERE a.is_active = true AND ws.workflow_step_id IS NULL;
+```
+
+#### Safety Guidelines
+- Always use READ queries first to investigate issues
+- Test UPDATE queries on development data before production
+- Ensure both PostgreSQL and MongoDB are updated for consistency
+- Remove debug endpoints before deploying to production

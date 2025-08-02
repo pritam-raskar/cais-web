@@ -5,6 +5,7 @@ import java.util.List;
 
 @Data
 public class StepTransitionDTO {
+    private StepInfo currentStep;
     private List<StepInfo> nextSteps;
     private List<StepInfo> backSteps;
 }

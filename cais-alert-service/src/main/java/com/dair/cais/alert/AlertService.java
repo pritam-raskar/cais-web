@@ -29,6 +29,7 @@ import com.dair.cais.type.AlertTypeExtended;
 import com.dair.cais.type.AlertTypeServiceExtended;
 import com.dair.cais.workflow.entity.WorkflowStepEntity;
 import com.dair.cais.workflow.entity.WorkflowTransitionEntity;
+import com.dair.cais.workflow.repository.WorkflowStepRepository;
 import com.dair.cais.workflow.repository.WorkflowTransitionRepository;
 import com.dair.cais.workflow.engine.WorkflowRuleEngine;
 import com.dair.cais.steps.permission.StepPermissionService;
@@ -89,6 +90,7 @@ public class AlertService {
    private final UserRepository userRepository;
    private final OrganizationFamilyRepository orgFamilyRepository;
    private final MongoQueryBuilder mongoQueryBuilder;
+   private final WorkflowStepRepository workflowStepRepository;
    private final WorkflowTransitionRepository workflowTransitionRepository;
    private final StepSlaService stepSlaService;
    private final WorkflowRuleEngine workflowRuleEngine;
@@ -720,6 +722,60 @@ public class AlertService {
    }
 
    /**
+    * Converts stepId to workflowStepId for the given workflow
+    */
+   private Long convertStepIdToWorkflowStepId(Long workflowId, Long stepId) {
+      try {
+         Optional<WorkflowStepEntity> workflowStepOpt = workflowStepRepository
+                 .findByWorkflowWorkflowIdAndStepStepId(workflowId, stepId);
+         
+         if (workflowStepOpt.isPresent()) {
+            return workflowStepOpt.get().getWorkflowStepId();
+         }
+         
+         log.warn("No workflowStepId found for workflowId: {}, stepId: {}", workflowId, stepId);
+         return null;
+      } catch (Exception e) {
+         log.error("Error converting stepId {} to workflowStepId for workflow {}: {}", 
+                 stepId, workflowId, e.getMessage());
+         return null;
+      }
+   }
+
+   /**
+    * Gets step name by workflowStepId
+    */
+   private String getStepNameByWorkflowStepId(Long workflowStepId) {
+      try {
+         Optional<WorkflowStepEntity> stepOpt = workflowStepRepository.findByWorkflowStepId(workflowStepId);
+         if (stepOpt.isPresent()) {
+            return stepOpt.get().getLabel();
+         }
+         return "Step " + workflowStepId;
+      } catch (Exception e) {
+         log.warn("Error getting step name for workflowStepId: {}", workflowStepId, e);
+         return "Step " + workflowStepId;
+      }
+   }
+
+   /**
+    * Gets step name by stepId for given workflow
+    */
+   private String getStepNameByStepId(Long workflowId, Long stepId) {
+      try {
+         Optional<WorkflowStepEntity> stepOpt = workflowStepRepository
+                 .findByWorkflowWorkflowIdAndStepStepId(workflowId, stepId);
+         if (stepOpt.isPresent()) {
+            return stepOpt.get().getLabel();
+         }
+         return "Step " + stepId;
+      } catch (Exception e) {
+         log.warn("Error getting step name for stepId: {} in workflow: {}", stepId, workflowId, e);
+         return "Step " + stepId;
+      }
+   }
+
+   /**
     * Validates if a step transition is allowed based on workflow configuration
     */
    private boolean validateStepTransition(String alertId, Long currentStepId, Long targetStepId) {
@@ -1042,35 +1098,50 @@ public class AlertService {
          Long currentStepId = mongoAlert.getAlertStepId() != null ? Long.parseLong(mongoAlert.getAlertStepId()) : null;
          log.debug("Transitioning alert {} from step {} to step {}", alertId, currentStepId, stepId);
          
-         // 3. Validate step transition is allowed
-         if (!validateStepTransition(alertId, currentStepId, stepId)) {
-            log.warn("Step transition not allowed: {} -> {} for alert {}", currentStepId, stepId, alertId);
-            throw new AlertOperationException("Step transition not allowed from step " + currentStepId + " to step " + stepId);
+         // Get workflow ID and convert stepId to workflowStepId for validation
+         Alert currentAlert = alertMapper.toModel(mongoAlert);
+         Long targetWorkflowStepId = null;
+         Long workflowId = null;
+         AlertTypeExtended alertType = null;
+         
+         if (currentAlert.getAlertTypeId() != null) {
+            alertType = alertTypeServiceExtended.getAlertTypeFields(currentAlert.getAlertTypeId());
+            if (alertType != null && alertType.getWorkflowId() != null) {
+               workflowId = Long.valueOf(alertType.getWorkflowId());
+               targetWorkflowStepId = convertStepIdToWorkflowStepId(workflowId, stepId);
+               log.debug("Converted stepId {} to workflowStepId {} for workflow {}", stepId, targetWorkflowStepId, workflowId);
+            }
+         }
+         
+         // 3. Validate step transition is allowed (using workflowStepId)
+         if (targetWorkflowStepId != null && !validateStepTransition(alertId, currentStepId, targetWorkflowStepId)) {
+            log.warn("Step transition not allowed: {} -> {} (workflowStepId) for alert {}", currentStepId, targetWorkflowStepId, alertId);
+            throw new AlertOperationException("Step transition not allowed from step " + currentStepId + " to step " + targetWorkflowStepId);
          }
          
          // 4. Check user permissions for step transition
          if (userId != null && !stepPermissionService.hasStepTransitionPermission(userId, alertId, currentStepId, stepId)) {
+            // Get step names for better error messaging
+            String currentStepName = getStepNameByWorkflowStepId(currentStepId);
+            String targetStepName = workflowId != null ? getStepNameByStepId(workflowId, stepId) : "Step " + stepId;
+            
             log.warn("User {} lacks permission for step transition {} -> {} on alert {}", userId, currentStepId, stepId, alertId);
-            throw new AlertOperationException("User " + userId + " does not have permission to transition from step " + currentStepId + " to step " + stepId);
+            throw new AlertOperationException("User " + userId + " does not have permission to transition from step " + 
+                    currentStepId + " (" + currentStepName + ") to step " + stepId + " (" + targetStepName + ")");
          }
          
          // 5. Validate business rules and prerequisites
-         Alert currentAlert = alertMapper.toModel(mongoAlert);
-         if (currentAlert.getAlertTypeId() != null) {
-            AlertTypeExtended alertType = alertTypeServiceExtended.getAlertTypeFields(currentAlert.getAlertTypeId());
-            if (alertType != null && alertType.getWorkflowId() != null) {
-               Long workflowId = Long.valueOf(alertType.getWorkflowId());
-               log.debug("Validating workflow rules for workflowId: {}", workflowId);
-               
-               WorkflowRuleEngine.ValidationResult ruleResult = workflowRuleEngine.validateTransitionRules(
-                       workflowId, currentStepId, stepId, currentAlert);
-               
-               if (!ruleResult.isValid()) {
-                  log.warn("Business rule validation failed for alert {}: {}", alertId, ruleResult.getErrorMessage());
-                  throw new AlertOperationException("Business rule validation failed: " + ruleResult.getErrorMessage());
-               }
-               log.debug("Business rule validation passed for alert: {}", alertId);
+         if (currentAlert.getAlertTypeId() != null && alertType != null && workflowId != null) {
+            log.debug("Validating workflow rules for workflowId: {}", workflowId);
+            
+            WorkflowRuleEngine.ValidationResult ruleResult = workflowRuleEngine.validateTransitionRules(
+                    workflowId, currentStepId, stepId, currentAlert);
+            
+            if (!ruleResult.isValid()) {
+               log.warn("Business rule validation failed for alert {}: {}", alertId, ruleResult.getErrorMessage());
+               throw new AlertOperationException("Business rule validation failed: " + ruleResult.getErrorMessage());
             }
+            log.debug("Business rule validation passed for alert: {}", alertId);
          }
          
          // 6. Check for auto-assignment rules
@@ -1673,6 +1744,7 @@ public class AlertService {
          if (alert == null) {
             throw new EntityNotFoundException("Alert not found with ID: " + alertId);
          }
+         log.debug("Retrieved alert: alertTypeId={}, alertStepId={}", alert.getAlertTypeId(), alert.getAlertStepId());
 
          if (alert.getAlertTypeId() == null) {
             throw new IllegalStateException("Alert type ID is not set for alert: " + alertId);
@@ -1683,29 +1755,54 @@ public class AlertService {
          if (alertType == null) {
             throw new EntityNotFoundException("Alert type not found with ID: " + alert.getAlertTypeId());
          }
+         log.debug("Retrieved alert type: workflowId={}", alertType.getWorkflowId());
 
          // Parse field schema to get workflow ID
          Long workflowId = extractWorkflowIdFromAlertType(alertType);
          if (workflowId == null) {
             throw new IllegalStateException("No workflow ID found in alert type configuration");
          }
+         log.debug("Extracted workflow ID: {}", workflowId);
 
          if (alert.getAlertStepId() == null) {
             throw new IllegalStateException("Alert does not have a current step assigned");
          }
 
-         Long currentStepId = Long.parseLong(alert.getAlertStepId());
+         Long alertStepId = Long.parseLong(alert.getAlertStepId());
+         log.debug("Alert step ID: {}", alertStepId);
 
-         // TODO: WF transition mapping in database is enterd as 17 & 18 instead of 70 & 6 (WF ID), may be because it is inserting step id's id
-         // fix the ui update first, that will fix the issue.
+         // Convert alertStepId to workflowStepId for transition queries
+         // The alertStepId could be either step_id or workflowStepId depending on how it was stored
+         Long currentWorkflowStepId = null;
+         
+         // First try to find by workflowStepId (legacy behavior)
+         Optional<WorkflowStepEntity> workflowStepOpt = workflowStepRepository.findByWorkflowStepId(alertStepId);
+         if (workflowStepOpt.isPresent()) {
+            currentWorkflowStepId = alertStepId; // It's already a workflowStepId
+            log.debug("Found step by workflowStepId: {}", currentWorkflowStepId);
+         } else {
+            // Try to find by step_id (new behavior after step change)
+            currentWorkflowStepId = convertStepIdToWorkflowStepId(workflowId, alertStepId);
+            if (currentWorkflowStepId != null) {
+               log.debug("Converted step_id {} to workflowStepId {}", alertStepId, currentWorkflowStepId);
+            }
+         }
+         
+         if (currentWorkflowStepId == null) {
+            throw new IllegalStateException("Cannot find workflowStepId for alert step: " + alertStepId);
+         }
 
          // Get next steps from workflow_transition table where current step is source
+         log.debug("Querying for next transitions: workflowId={}, sourceWorkflowStepId={}", workflowId, currentWorkflowStepId);
          List<WorkflowTransitionEntity> nextTransitions = workflowTransitionRepository
-                 .findByWorkflowWorkflowIdAndSourceStepWorkflowStepId(workflowId, currentStepId);
+                 .findByWorkflowWorkflowIdAndSourceStepWorkflowStepId(workflowId, currentWorkflowStepId);
+         log.debug("Found {} next transitions", nextTransitions.size());
 
          // Get previous steps from workflow_transition table where current step is target
+         log.debug("Querying for previous transitions: workflowId={}, targetWorkflowStepId={}", workflowId, currentWorkflowStepId);
          List<WorkflowTransitionEntity> previousTransitions = workflowTransitionRepository
-                 .findByWorkflowWorkflowIdAndTargetStepWorkflowStepId(workflowId, currentStepId);
+                 .findByWorkflowWorkflowIdAndTargetStepWorkflowStepId(workflowId, currentWorkflowStepId);
+         log.debug("Found {} previous transitions", previousTransitions.size());
 
          StepTransitionDTO transitionDTO = new StepTransitionDTO();
 
@@ -1731,11 +1828,29 @@ public class AlertService {
                  })
                  .collect(Collectors.toList());
 
+         // Get current step information using the correct workflowStepId
+         Optional<WorkflowStepEntity> currentStepEntityOpt = workflowStepRepository
+                 .findByWorkflowStepId(currentWorkflowStepId);
+         
+         StepInfo currentStep = null;
+         if (currentStepEntityOpt.isPresent()) {
+            WorkflowStepEntity currentStepEntity = currentStepEntityOpt.get();
+            currentStep = new StepInfo();
+            currentStep.setStepId(currentStepEntity.getStep().getStepId());
+            currentStep.setLabel(currentStepEntity.getLabel());
+            log.debug("Found current step: workflowStepId={}, stepId={}, label={}", 
+                    currentWorkflowStepId, currentStep.getStepId(), currentStep.getLabel());
+         } else {
+            log.warn("Current step not found for alert ID: {}, workflowStepId: {}", 
+                    alertId, currentWorkflowStepId);
+         }
+
+         transitionDTO.setCurrentStep(currentStep);
          transitionDTO.setNextSteps(nextSteps);
          transitionDTO.setBackSteps(backSteps);
 
-         log.debug("Found {} next steps and {} back steps for alert ID: {}",
-                 nextSteps.size(), backSteps.size(), alertId);
+         log.debug("Found current step: {}, {} next steps and {} back steps for alert ID: {}",
+                 currentStep != null ? currentStep.getLabel() : "null", nextSteps.size(), backSteps.size(), alertId);
 
          return transitionDTO;
 

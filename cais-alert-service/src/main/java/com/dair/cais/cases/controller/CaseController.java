@@ -1,7 +1,13 @@
 package com.dair.cais.cases.controller;
 
+import com.dair.cais.audit.AuditLogRequest;
 import com.dair.cais.cases.Case;
+import com.dair.cais.cases.dto.BulkStepChangeRequest;
+import com.dair.cais.cases.dto.BulkStepChangeResponse;
 import com.dair.cais.cases.service.CaseService;
+import com.dair.cais.cases.workflow.service.CaseWorkflowService;
+import com.dair.cais.workflow.dto.StepTransitionDTO;
+import com.dair.cais.workflow.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,6 +37,7 @@ import java.util.Map;
 public class CaseController {
 
     private final CaseService caseService;
+    private final CaseWorkflowService caseWorkflowService;
 
     /**
      * Creates a new case.
@@ -304,6 +311,247 @@ public class CaseController {
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Error assigning case", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Changes the step for a single case.
+     *
+     * @param caseId the case ID
+     * @param stepId the target step ID
+     * @param userId the user making the change (optional)
+     * @return the updated case
+     */
+    @PatchMapping("/changestep/{caseId}")
+    @Operation(summary = "Change case step")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Case step changed successfully",
+                    content = @Content(schema = @Schema(implementation = Case.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request or invalid transition",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Case or step not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<Case> changeStep(
+            @Parameter(description = "ID of the case", required = true)
+            @PathVariable Long caseId,
+            @Parameter(description = "ID of the target step", required = true)
+            @RequestParam Long stepId,
+            @Parameter(description = "User making the change")
+            @RequestParam(required = false) String userId) {
+        log.info("REST request to change step for case ID: {} to step ID: {} by user: {}", caseId, stepId, userId);
+        
+        try {
+            String user = userId != null ? userId : "SYSTEM";
+            Case updatedCase = caseWorkflowService.changeStep(caseId, stepId, user);
+            return ResponseEntity.ok(updatedCase);
+        } catch (EntityNotFoundException e) {
+            log.error("Entity not found: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            log.error("Invalid request: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error changing case step", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Changes the step for a single case with audit logging.
+     *
+     * @param caseId the case ID
+     * @param stepId the target step ID
+     * @param auditLogRequest the audit log request
+     * @return the updated case
+     */
+    @PatchMapping("/audit/changestep/{caseId}")
+    @Operation(summary = "Change case step with audit")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Case step changed successfully with audit",
+                    content = @Content(schema = @Schema(implementation = Case.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request or invalid transition"),
+            @ApiResponse(responseCode = "404", description = "Case or step not found"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<Case> changeStepWithAudit(
+            @Parameter(description = "ID of the case", required = true)
+            @PathVariable Long caseId,
+            @Parameter(description = "ID of the target step", required = true)
+            @RequestParam Long stepId,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.info("REST request to change step for case ID: {} to step ID: {} with audit", caseId, stepId);
+        
+        try {
+            Case updatedCase = caseWorkflowService.changeStepWithAudit(caseId, stepId, auditLogRequest);
+            return ResponseEntity.ok(updatedCase);
+        } catch (EntityNotFoundException e) {
+            log.error("Entity not found: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            log.error("Invalid request: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error changing case step with audit", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Performs bulk step change for multiple cases.
+     *
+     * @param request the bulk step change request
+     * @return the bulk step change response
+     */
+    @PostMapping("/bulk/step-change")
+    @Operation(summary = "Change steps for multiple cases",
+            description = "Bulk operation to change steps for multiple cases with individual validation")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Bulk operation completed",
+                    content = @Content(schema = @Schema(implementation = BulkStepChangeResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request data",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<BulkStepChangeResponse> bulkStepChange(
+            @Parameter(description = "Bulk step change request", required = true)
+            @Valid @RequestBody BulkStepChangeRequest request) {
+        log.info("REST request for bulk step change: {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = caseWorkflowService.changeStepBulk(request);
+            log.info("Bulk step change completed: {} successful, {} failed", 
+                    response.getSuccessCount(), response.getFailureCount());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during bulk step change operation", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Performs bulk step change for multiple cases with audit logging.
+     *
+     * @param request the bulk step change request
+     * @param auditLogRequest the audit log request
+     * @return the bulk step change response
+     */
+    @PostMapping("/audit/bulk/step-change")
+    @Operation(summary = "Change steps for multiple cases with audit",
+            description = "Bulk operation to change steps for multiple cases with audit logging")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Bulk operation completed with audit",
+                    content = @Content(schema = @Schema(implementation = BulkStepChangeResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request data"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<BulkStepChangeResponse> bulkStepChangeWithAudit(
+            @Valid @RequestBody BulkStepChangeRequest request,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.info("REST request for bulk step change with audit: {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = caseWorkflowService.changeStepBulkWithAudit(request, auditLogRequest);
+            log.info("Bulk step change with audit completed: {} successful, {} failed", 
+                    response.getSuccessCount(), response.getFailureCount());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during bulk step change with audit", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Alternative bulk step change endpoint (for compatibility).
+     *
+     * @param request the bulk step change request
+     * @return the bulk step change response
+     */
+    @PostMapping("/bulk/change-step")
+    @Operation(summary = "Alternative endpoint for bulk step change",
+            description = "Alternative bulk operation to change steps for multiple cases")
+    public ResponseEntity<BulkStepChangeResponse> changeStepBulk(
+            @Parameter(description = "Bulk step change request", required = true)
+            @Valid @RequestBody BulkStepChangeRequest request) {
+        log.info("REST request for alternative bulk step change: {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = caseWorkflowService.changeStepBulk(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during alternative bulk step change operation", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Alternative bulk step change endpoint with audit (for compatibility).
+     *
+     * @param request the bulk step change request
+     * @param auditLogRequest the audit log request
+     * @return the bulk step change response
+     */
+    @PostMapping("/audit/bulk/change-step")
+    @Operation(summary = "Alternative endpoint for bulk step change with audit",
+            description = "Alternative bulk operation with audit logging")
+    public ResponseEntity<BulkStepChangeResponse> changeStepBulkWithAudit(
+            @Valid @RequestBody BulkStepChangeRequest request,
+            @RequestBody AuditLogRequest auditLogRequest) {
+        log.info("REST request for alternative bulk step change with audit: {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        try {
+            BulkStepChangeResponse response = caseWorkflowService.changeStepBulkWithAudit(request, auditLogRequest);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during alternative bulk step change with audit", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Gets step transitions for a case.
+     *
+     * @param caseId the case ID
+     * @return the step transitions
+     */
+    @GetMapping("/{caseId}/step-transitions")
+    @Operation(summary = "Get next and previous possible steps for a case",
+            description = "Returns the possible next steps and previous steps based on the current step in the workflow")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved step transitions",
+                    content = @Content(schema = @Schema(implementation = StepTransitionDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Case or workflow not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<StepTransitionDTO> getCaseStepTransitions(
+            @Parameter(description = "ID of the case", required = true)
+            @PathVariable Long caseId) {
+        log.info("REST request to get step transitions for case ID: {}", caseId);
+
+        try {
+            log.debug("Calling caseWorkflowService.getCaseStepTransitions for caseId: {}", caseId);
+            StepTransitionDTO transitions = caseWorkflowService.getCaseStepTransitions(caseId);
+            log.debug("Received transitions: nextSteps={}, backSteps={}", 
+                    transitions.getNextSteps().size(), transitions.getBackSteps().size());
+            return ResponseEntity.ok(transitions);
+        } catch (EntityNotFoundException e) {
+            log.warn("Case or workflow not found for case ID: {}", caseId, e);
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            log.error("Invalid workflow state for case ID: {}", caseId, e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error retrieving step transitions for case ID: {}", caseId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

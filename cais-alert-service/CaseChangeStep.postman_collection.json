@@ -1,0 +1,430 @@
+{
+	"info": {
+		"_postman_id": "case-change-step-collection",
+		"name": "CaseChangeStep",
+		"description": "Collection for CAIS Alert Service case step change operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Single Case Step Changes",
+			"item": [
+				{
+					"name": "Change Case Step",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cases/changestep/{{caseId}}?stepId={{stepId}}&userId={{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"changestep",
+								"{{caseId}}"
+							],
+							"query": [
+								{
+									"key": "stepId",
+									"value": "{{stepId}}"
+								},
+								{
+									"key": "userId",
+									"value": "{{userId}}"
+								}
+							]
+						},
+						"description": "Change step for a single case"
+					}
+				},
+				{
+					"name": "Change Case Step with Audit",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 123,\n  \"userRole\": \"analyst\",\n  \"actionId\": 1,\n  \"description\": \"Moving case to next step\",\n  \"category\": \"STEP_CHANGE\",\n  \"affectedItemType\": \"Case\",\n  \"affectedItemId\": \"{{caseId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cases/audit/changestep/{{caseId}}?stepId={{stepId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"audit",
+								"changestep",
+								"{{caseId}}"
+							],
+							"query": [
+								{
+									"key": "stepId",
+									"value": "{{stepId}}"
+								}
+							]
+						},
+						"description": "Change step for a single case with audit logging"
+					}
+				}
+			]
+		},
+		{
+			"name": "Bulk Step Changes",
+			"item": [
+				{
+					"name": "Bulk Step Change",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caseIds\": [{{caseId}}, 2, 3],\n  \"stepId\": {{stepId}},\n  \"reason\": \"Bulk step change operation\",\n  \"skipValidation\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cases/bulk/step-change",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"bulk",
+								"step-change"
+							]
+						},
+						"description": "Bulk step change for multiple cases"
+					}
+				},
+				{
+					"name": "Bulk Step Change with Audit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caseIds\": [{{caseId}}, 2, 3],\n  \"stepId\": {{stepId}},\n  \"reason\": \"Bulk step change operation with audit\",\n  \"skipValidation\": false,\n  \"auditLogRequest\": {\n    \"userId\": 123,\n    \"userRole\": \"analyst\",\n    \"actionId\": 2,\n    \"description\": \"Bulk case step change via API\",\n    \"category\": \"BULK_STEP_CHANGE\",\n    \"affectedItemType\": \"Case\",\n    \"affectedItemId\": \"BULK_OPERATION\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cases/audit/bulk/step-change",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"audit",
+								"bulk",
+								"step-change"
+							]
+						},
+						"description": "Bulk step change for multiple cases with audit logging"
+					}
+				},
+				{
+					"name": "Alternative Bulk Change Step",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caseIds\": [{{caseId}}, 2, 3],\n  \"stepId\": {{stepId}},\n  \"reason\": \"Alternative bulk step change\",\n  \"skipValidation\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cases/bulk/change-step",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"bulk",
+								"change-step"
+							]
+						},
+						"description": "Alternative endpoint for bulk step change"
+					}
+				},
+				{
+					"name": "Alternative Bulk Change Step with Audit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caseIds\": [{{caseId}}, 2, 3],\n  \"stepId\": {{stepId}},\n  \"reason\": \"Alternative bulk step change with audit\",\n  \"skipValidation\": false,\n  \"auditLogRequest\": {\n    \"userId\": 123,\n    \"userRole\": \"analyst\",\n    \"actionId\": 3,\n    \"description\": \"Alternative bulk case step change via API\",\n    \"category\": \"BULK_STEP_CHANGE\",\n    \"affectedItemType\": \"Case\",\n    \"affectedItemId\": \"BULK_OPERATION\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cases/audit/bulk/change-step",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"audit",
+								"bulk",
+								"change-step"
+							]
+						},
+						"description": "Alternative endpoint for bulk step change with audit logging"
+					}
+				}
+			]
+		},
+		{
+			"name": "Step Information",
+			"item": [
+				{
+					"name": "Get Case Step Transitions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cases/{{caseId}}/step-transitions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"{{caseId}}",
+								"step-transitions"
+							]
+						},
+						"description": "Get available step transitions for a specific case (next and back steps)"
+					}
+				},
+				{
+					"name": "Get Available Steps via Case Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/case-workflows/cases/{{caseId}}/available-steps",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"case-workflows",
+								"cases",
+								"{{caseId}}",
+								"available-steps"
+							]
+						},
+						"description": "Get all available steps for a case based on case type workflow (case → caseType → workflow → steps)"
+					}
+				},
+				{
+					"name": "Get Case Step History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/audit/item/stephistory?caseId={{caseId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"audit",
+								"item",
+								"stephistory"
+							],
+							"query": [
+								{
+									"key": "caseId",
+									"value": "{{caseId}}"
+								}
+							]
+						},
+						"description": "Get step history for audit trail (if supported by audit system)"
+					}
+				},
+				{
+					"name": "Get Possible Transitions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/case-workflows/cases/{{caseId}}/possible-transitions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"case-workflows",
+								"cases",
+								"{{caseId}}",
+								"possible-transitions"
+							]
+						},
+						"description": "Get possible workflow transitions for a case"
+					}
+				}
+			]
+		},
+		{
+			"name": "Case Workflow Management",
+			"item": [
+				{
+					"name": "Assign Workflow to Case",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/case-workflows/cases/{{caseId}}/assign-workflow?workflowId={{workflowId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"case-workflows",
+								"cases",
+								"{{caseId}}",
+								"assign-workflow"
+							],
+							"query": [
+								{
+									"key": "workflowId",
+									"value": "{{workflowId}}"
+								}
+							]
+						},
+						"description": "Assign a workflow to a case"
+					}
+				},
+				{
+					"name": "Transition Case Step",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Transitioning case to next step\",\n  \"comments\": \"Case review completed successfully\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/case-workflows/cases/{{caseId}}/transition?stepId={{stepId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"case-workflows",
+								"cases",
+								"{{caseId}}",
+								"transition"
+							],
+							"query": [
+								{
+									"key": "stepId",
+									"value": "{{stepId}}"
+								}
+							]
+						},
+						"description": "Transition a case to a new step with reason"
+					}
+				}
+			]
+		},
+		{
+			"name": "Case Information",
+			"item": [
+				{
+					"name": "Get Case Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cases/{{caseId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases",
+								"{{caseId}}"
+							]
+						},
+						"description": "Get case details by ID"
+					}
+				},
+				{
+					"name": "Get All Cases",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cases",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cases"
+							]
+						},
+						"description": "Get all cases"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8081",
+			"description": "Base URL for the CAIS Alert Service"
+		},
+		{
+			"key": "caseId",
+			"value": "1",
+			"description": "Case ID for single case operations"
+		},
+		{
+			"key": "stepId",
+			"value": "17",
+			"description": "Target step ID for step change operations"
+		},
+		{
+			"key": "workflowId",
+			"value": "104",
+			"description": "Workflow ID for workflow assignment operations"
+		},
+		{
+			"key": "userId",
+			"value": "user123",
+			"description": "User ID for operations requiring user context"
+		}
+	]
+}

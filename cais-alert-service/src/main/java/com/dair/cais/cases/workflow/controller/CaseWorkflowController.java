@@ -35,17 +35,19 @@ public class CaseWorkflowController {
     private final CaseWorkflowService caseWorkflowService;
 
     /**
-     * Gets available steps for a case.
+     * Gets all available steps for a case based on case type workflow.
+     * Follows the pattern: case → caseType → workflow → steps
      *
      * @param caseId the case ID
-     * @return the list of available steps
+     * @return the list of all workflow steps
      */
     @GetMapping("/cases/{caseId}/available-steps")
-    @Operation(summary = "Get available steps for a case")
+    @Operation(summary = "Get all available steps for a case via case type workflow",
+            description = "Returns all steps in the workflow associated with the case's case type")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Steps retrieved successfully"),
-            @ApiResponse(responseCode = "404", description = "Case not found"),
-            @ApiResponse(responseCode = "400", description = "Case has no workflow assigned or no current step"),
+            @ApiResponse(responseCode = "404", description = "Case or case type not found"),
+            @ApiResponse(responseCode = "400", description = "Case has no case type assigned or case type has no workflow"),
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     public ResponseEntity<List<Step>> getAvailableSteps(
@@ -54,7 +56,7 @@ public class CaseWorkflowController {
         log.info("REST request to get available steps for case ID: {}", caseId);
 
         try {
-            List<Step> steps = caseWorkflowService.getAvailableSteps(caseId);
+            List<Step> steps = caseWorkflowService.getAvailableStepsViaCaseType(caseId);
             return ResponseEntity.ok(steps);
         } catch (EntityNotFoundException e) {
             log.error("Case not found: {}", e.getMessage());

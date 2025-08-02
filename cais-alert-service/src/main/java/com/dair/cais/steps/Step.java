@@ -1,5 +1,6 @@
 package com.dair.cais.steps;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 @Data
 @Entity
 @Table(name = "cm_steps", schema = "info_alert")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Step {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "step_id_seq")

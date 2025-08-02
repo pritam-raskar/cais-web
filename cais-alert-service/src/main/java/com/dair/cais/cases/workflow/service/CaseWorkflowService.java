@@ -1,9 +1,15 @@
 package com.dair.cais.cases.workflow.service;
 
+import com.dair.cais.audit.AuditLogRequest;
+import com.dair.cais.audit.AuditTrailService;
 import com.dair.cais.cases.Case;
+import com.dair.cais.cases.dto.BulkStepChangeRequest;
+import com.dair.cais.cases.dto.BulkStepChangeResponse;
 import com.dair.cais.cases.entity.CaseEntity;
+import com.dair.cais.cases.entity.CaseTypeEntity;
 import com.dair.cais.cases.mapper.CaseMapper;
 import com.dair.cais.cases.repository.CaseRepository;
+import com.dair.cais.cases.repository.CaseTypeRepository;
 import com.dair.cais.steps.Step;
 import com.dair.cais.steps.StepRepository;
 import com.dair.cais.workflow.dto.StepTransitionDTO;
@@ -22,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -34,11 +42,13 @@ import java.util.stream.Collectors;
 public class CaseWorkflowService {
 
     private final CaseRepository caseRepository;
+    private final CaseTypeRepository caseTypeRepository;
     private final CaseMapper caseMapper;
     private final WorkflowRepository workflowRepository;
     private final WorkflowStepRepository workflowStepRepository;
     private final WorkflowTransitionRepository workflowTransitionRepository;
     private final StepRepository stepRepository;
+    private final AuditTrailService auditTrailService;
 
     /**
      * Gets available steps for a case based on its current step.
@@ -66,17 +76,77 @@ public class CaseWorkflowService {
                         caseEntity.getWorkflowId(),
                         currentStepId);
 
-        // Extract target steps from transitions
-        List<Step> availableSteps = new ArrayList<>();
-        for (WorkflowTransitionEntity transition : transitions) {
-            WorkflowStepEntity targetStepEntity = transition.getTargetStep();
-            Step step = stepRepository.findById(targetStepEntity.getStep().getStepId())
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "Step not found with ID: " + targetStepEntity.getStep().getStepId()));
-            availableSteps.add(step);
-        }
+        // Extract target step IDs from transitions to avoid lazy loading issues
+        List<Long> stepIds = transitions.stream()
+                .map(transition -> transition.getTargetStep().getStep().getStepId())
+                .toList();
+        
+        // Fetch all steps in one query to avoid lazy loading issues
+        List<Step> availableSteps = stepRepository.findAllById(stepIds);
+        
+        // Force initialization to avoid Jackson serialization issues with Hibernate proxies
+        availableSteps.forEach(step -> {
+            step.getStepId(); // Force initialization
+            step.getStepName(); // Force initialization
+        });
 
         log.info("Found {} available steps for case ID: {}", availableSteps.size(), caseId);
+        return availableSteps;
+    }
+
+    /**
+     * Gets all available steps for a case based on case type → workflow mapping.
+     * This follows the pattern: case → caseType → workflow → steps
+     *
+     * @param caseId the case ID
+     * @return list of all workflow steps
+     * @throws EntityNotFoundException if the case, case type, or workflow is not found
+     */
+    @Transactional(readOnly = true)
+    public List<Step> getAvailableStepsViaCaseType(Long caseId) {
+        log.debug("Getting available steps via case type for case ID: {}", caseId);
+
+        CaseEntity caseEntity = getCaseEntityById(caseId);
+        
+        // Get case type name from case
+        String caseTypeName = caseEntity.getCaseType();
+        if (caseTypeName == null || caseTypeName.trim().isEmpty()) {
+            log.error("Case ID: {} does not have a case type assigned", caseId);
+            throw new IllegalStateException("Case does not have a case type assigned");
+        }
+
+        // Get case type entity to find workflow ID
+        CaseTypeEntity caseTypeEntity = caseTypeRepository.findByName(caseTypeName)
+                .orElseThrow(() -> {
+                    log.error("Case type not found with name: {}", caseTypeName);
+                    return new EntityNotFoundException("Case type not found with name: " + caseTypeName);
+                });
+
+        Long workflowId = caseTypeEntity.getWorkflowId();
+        if (workflowId == null) {
+            log.error("Case type '{}' does not have a workflow assigned", caseTypeName);
+            throw new IllegalStateException("Case type does not have a workflow assigned");
+        }
+
+        // Get all workflow steps
+        List<WorkflowStepEntity> workflowSteps = workflowStepRepository.findByWorkflowWorkflowId(workflowId);
+        
+        // Convert to Step entities - collect step IDs first to avoid lazy loading issues
+        List<Long> stepIds = workflowSteps.stream()
+                .map(workflowStep -> workflowStep.getStep().getStepId())
+                .toList();
+        
+        // Fetch all steps in one query to avoid lazy loading issues
+        List<Step> availableSteps = stepRepository.findAllById(stepIds);
+        
+        // Force initialization to avoid Jackson serialization issues with Hibernate proxies
+        availableSteps.forEach(step -> {
+            step.getStepId(); // Force initialization
+            step.getStepName(); // Force initialization
+        });
+
+        log.info("Found {} available steps via case type '{}' for case ID: {}", 
+                availableSteps.size(), caseTypeName, caseId);
         return availableSteps;
     }
 
@@ -371,5 +441,146 @@ public class CaseWorkflowService {
                 stepId, caseEntity.getCaseId());
 
         return caseMapper.toModel(savedEntity);
+    }
+
+    /**
+     * Changes the step for a single case.
+     *
+     * @param caseId the case ID
+     * @param stepId the target step ID
+     * @param userId the user making the change
+     * @return the updated case
+     */
+    @Transactional
+    public Case changeStep(Long caseId, Long stepId, String userId) {
+        log.debug("Changing step for case ID: {} to step ID: {} by user: {}", caseId, stepId, userId);
+        return transitionCase(caseId, stepId, "Step change via API", userId);
+    }
+
+    /**
+     * Changes the step for a single case with audit logging.
+     *
+     * @param caseId the case ID
+     * @param stepId the target step ID
+     * @param auditLogRequest the audit log request
+     * @return the updated case
+     */
+    @Transactional
+    public Case changeStepWithAudit(Long caseId, Long stepId, AuditLogRequest auditLogRequest) {
+        log.debug("Changing step for case ID: {} to step ID: {} with audit", caseId, stepId);
+        
+        CaseEntity caseEntity = getCaseEntityById(caseId);
+        String oldStepId = caseEntity.getCurrentStepId() != null ? caseEntity.getCurrentStepId().toString() : null;
+        
+        Case updatedCase = transitionCase(caseId, stepId, auditLogRequest.getDescription(), auditLogRequest.getUserId().toString());
+        
+        // Log audit trail
+        auditTrailService.logAction(
+                auditLogRequest.getUserId(),
+                auditLogRequest.getUserRole(),
+                auditLogRequest.getActionId(),
+                auditLogRequest.getDescription(),
+                auditLogRequest.getCategory(),
+                "Case",
+                caseId.toString(),
+                oldStepId,
+                stepId.toString()
+        );
+        
+        return updatedCase;
+    }
+
+    /**
+     * Performs bulk step change for multiple cases.
+     *
+     * @param request the bulk step change request
+     * @return the bulk step change response
+     */
+    @Transactional
+    public BulkStepChangeResponse changeStepBulk(BulkStepChangeRequest request) {
+        log.info("Starting bulk step change for {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        BulkStepChangeResponse response = new BulkStepChangeResponse();
+        response.setTotalRequested(request.getCaseIds().size());
+        response.setSuccessfulCaseIds(new ArrayList<>());
+        response.setFailedCases(new HashMap<>());
+        response.setValidationErrors(new ArrayList<>());
+        
+        // Validate step exists
+        if (!stepRepository.existsById(request.getStepId())) {
+            response.getValidationErrors().add("Step ID " + request.getStepId() + " does not exist");
+            response.setFailureCount(request.getCaseIds().size());
+            return response;
+        }
+        
+        // Process each case individually
+        for (Long caseId : request.getCaseIds()) {
+            try {
+                Case updatedCase = changeStep(caseId, request.getStepId(), "BULK_OPERATION");
+                response.getSuccessfulCaseIds().add(caseId);
+                log.debug("Successfully changed step for case ID: {}", caseId);
+            } catch (Exception e) {
+                response.getFailedCases().put(caseId, e.getMessage());
+                log.error("Failed to change step for case ID: {}", caseId, e);
+            }
+        }
+        
+        response.setSuccessCount(response.getSuccessfulCaseIds().size());
+        response.setFailureCount(response.getFailedCases().size());
+        
+        log.info("Bulk step change completed: {} successful, {} failed", 
+                response.getSuccessCount(), response.getFailureCount());
+        
+        return response;
+    }
+
+    /**
+     * Performs bulk step change for multiple cases with audit logging.
+     *
+     * @param request the bulk step change request
+     * @param auditLogRequest the audit log request
+     * @return the bulk step change response
+     */
+    @Transactional
+    public BulkStepChangeResponse changeStepBulkWithAudit(BulkStepChangeRequest request, AuditLogRequest auditLogRequest) {
+        log.info("Starting bulk step change with audit for {} cases to step {}", 
+                request.getCaseIds().size(), request.getStepId());
+        
+        LocalDateTime bulkOperationStartTime = LocalDateTime.now();
+        BulkStepChangeResponse response = changeStepBulk(request);
+        LocalDateTime bulkOperationEndTime = LocalDateTime.now();
+        
+        // Enhanced bulk operation audit
+        try {
+            Map<String, Object> bulkOperationDetails = new HashMap<>();
+            bulkOperationDetails.put("requestedCases", request.getCaseIds());
+            bulkOperationDetails.put("targetStepId", request.getStepId());
+            bulkOperationDetails.put("successfulCases", response.getSuccessfulCaseIds());
+            bulkOperationDetails.put("failedCases", response.getFailedCases());
+            bulkOperationDetails.put("operationStartTime", bulkOperationStartTime.toString());
+            bulkOperationDetails.put("operationEndTime", bulkOperationEndTime.toString());
+            bulkOperationDetails.put("totalRequested", response.getTotalRequested());
+            bulkOperationDetails.put("successCount", response.getSuccessCount());
+            bulkOperationDetails.put("failureCount", response.getFailureCount());
+            
+            auditTrailService.logAction(
+                    auditLogRequest.getUserId(),
+                    auditLogRequest.getUserRole(), 
+                    auditLogRequest.getActionId(),
+                    "Bulk case step change: " + auditLogRequest.getDescription(),
+                    "BULK_STEP_CHANGE",
+                    "Case",
+                    "BULK_OPERATION",
+                    request.getCaseIds().toString(),
+                    request.getStepId().toString()
+            );
+            
+            log.info("Bulk operation audit logged for user: {}", auditLogRequest.getUserId());
+        } catch (Exception e) {
+            log.error("Failed to log bulk operation audit", e);
+        }
+        
+        return response;
     }
 }

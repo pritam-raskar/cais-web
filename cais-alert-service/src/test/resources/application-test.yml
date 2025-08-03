@@ -1,0 +1,50 @@
+spring:
+  # Use actual PostgreSQL database for integration testing
+  datasource:
+    url: jdbc:postgresql://cais-db-main.clemsk88yp4y.us-east-1.rds.amazonaws.com:5432/case_manager
+    username: admin01
+    password: CaisSimplePassword123
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      idle-timeout: 300000
+      connection-timeout: 20000
+  
+  # JPA Configuration for tests
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: info_alert
+        format_sql: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+        
+  # MongoDB Test Configuration - use actual MongoDB
+  data:
+    mongodb:
+      uri: mongodb+srv://cmpadmin:MyCmpPasswd@caiscluster01.k3frl5v.mongodb.net/CMP_DB
+      database: CMP_DB
+      
+  # Disable security for tests
+  security:
+    enabled: false
+    
+  # Logging configuration
+  logging:
+    level:
+      com.dair.cais: DEBUG
+      org.springframework.web: DEBUG
+      org.springframework.test: DEBUG
+      
+# Test specific configurations
+test:
+  data:
+    cleanup: true
+    
+# Disable unnecessary features for tests
+management:
+  endpoints:
+    enabled: false

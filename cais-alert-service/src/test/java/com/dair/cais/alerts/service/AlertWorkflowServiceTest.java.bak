@@ -1,0 +1,360 @@
+package com.dair.cais.alerts.service;
+
+import com.dair.cais.alert.Alert;
+import com.dair.cais.alert.AlertEntity;
+import com.dair.cais.alert.AlertRepository;
+import com.dair.cais.alert.AlertService;
+import com.dair.cais.alert.dto.StepTransitionDTO;
+import com.dair.cais.alert.dto.StepInfo;
+import com.dair.cais.alerts.AlertTestDataFactory;
+import com.dair.cais.steps.Step;
+import com.dair.cais.steps.StepRepository;
+import com.dair.cais.workflow.entity.WorkflowStepEntity;
+import com.dair.cais.workflow.entity.WorkflowTransitionEntity;
+import com.dair.cais.workflow.repository.WorkflowStepRepository;
+import com.dair.cais.workflow.repository.WorkflowTransitionRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Unit tests for Alert Workflow functionality
+ * Testing workflow-specific operations like step transitions, validations, and assignments
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("Alert Workflow Service Tests")
+class AlertWorkflowServiceTest {
+
+    @Mock
+    private AlertRepository alertRepository;
+
+    @Mock
+    private StepRepository stepRepository;
+
+    @Mock
+    private WorkflowStepRepository workflowStepRepository;
+
+    @Mock
+    private WorkflowTransitionRepository workflowTransitionRepository;
+
+    @InjectMocks
+    private AlertService alertService;
+
+    @Test
+    @DisplayName("Should get alert step transitions successfully")
+    void getAlertStepTransitions_ValidAlert_ReturnsStepTransitions() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setAlertStepId(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        // Mock current step
+        Step currentStep = new Step();
+        currentStep.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        currentStep.setLabel("Ready");
+        currentStep.setWorkflowId(Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID));
+
+        // Mock next steps
+        Step nextStep1 = new Step();
+        nextStep1.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+        nextStep1.setLabel("Under Review");
+
+        Step nextStep2 = new Step();
+        nextStep2.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.REJECTED_STEP_ID));
+        nextStep2.setLabel("Rejected");
+
+        // Mock workflow transitions
+        WorkflowTransitionEntity transition1 = new WorkflowTransitionEntity();
+        transition1.setSourceStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        transition1.setTargetStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+
+        WorkflowTransitionEntity transition2 = new WorkflowTransitionEntity();
+        transition2.setSourceStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        transition2.setTargetStepId(Long.valueOf(AlertTestDataFactory.REJECTED_STEP_ID));
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(stepRepository.findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID)))
+                .thenReturn(Optional.of(currentStep));
+        when(workflowTransitionRepository.findByWorkflowIdAndSourceStepId(
+                Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID),
+                Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID)))
+                .thenReturn(Arrays.asList(transition1, transition2));
+        when(stepRepository.findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID)))
+                .thenReturn(Optional.of(nextStep1));
+        when(stepRepository.findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.REJECTED_STEP_ID)))
+                .thenReturn(Optional.of(nextStep2));
+
+        // When
+        StepTransitionDTO result = alertService.getAlertStepTransitions(alertId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getCurrentStep()).isNotNull();
+        assertThat(result.getCurrentStep().getStepName()).isEqualTo("Ready");
+        assertThat(result.getNextSteps()).hasSize(2);
+        assertThat(result.getNextSteps().get(0).getStepName()).isIn("Under Review", "Rejected");
+        
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(stepRepository).findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        verify(workflowTransitionRepository).findByWorkflowIdAndSourceStepId(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should handle step transitions for non-existent alert")
+    void getAlertStepTransitions_AlertNotFound_ThrowsEntityNotFoundException() {
+        // Given
+        String alertId = "NON_EXISTENT_ALERT";
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> alertService.getAlertStepTransitions(alertId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("Alert not found");
+
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(stepRepository, never()).findByWorkflowStepId(anyLong());
+    }
+
+    @Test
+    @DisplayName("Should validate workflow step transition")
+    void validateStepTransition_ValidTransition_ReturnsTrue() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        Long currentStepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+        Long targetStepId = Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID);
+        Long workflowId = Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID);
+
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setAlertStepId(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        Step currentStep = new Step();
+        currentStep.setWorkflowStepId(currentStepId);
+        currentStep.setWorkflowId(workflowId);
+
+        WorkflowTransitionEntity validTransition = new WorkflowTransitionEntity();
+        validTransition.setSourceStepId(currentStepId);
+        validTransition.setTargetStepId(targetStepId);
+        validTransition.setWorkflowId(workflowId);
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(stepRepository.findByWorkflowStepId(currentStepId)).thenReturn(Optional.of(currentStep));
+        when(workflowTransitionRepository.findByWorkflowIdAndSourceStepIdAndTargetStepId(
+                workflowId, currentStepId, targetStepId))
+                .thenReturn(Optional.of(validTransition));
+
+        // When - Call through AlertService method that includes validation
+        Alert result = alertService.changeStep(alertId, targetStepId, "TEST_USER");
+
+        // Then
+        assertThat(result).isNotNull();
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(workflowTransitionRepository).findByWorkflowIdAndSourceStepIdAndTargetStepId(
+                workflowId, currentStepId, targetStepId);
+    }
+
+    @Test
+    @DisplayName("Should reject invalid workflow step transition")
+    void validateStepTransition_InvalidTransition_ThrowsException() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        Long currentStepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+        Long invalidTargetStepId = 999L; // Non-existent step
+        Long workflowId = Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID);
+
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setAlertStepId(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        Step currentStep = new Step();
+        currentStep.setWorkflowStepId(currentStepId);
+        currentStep.setWorkflowId(workflowId);
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(stepRepository.findByWorkflowStepId(currentStepId)).thenReturn(Optional.of(currentStep));
+        when(workflowTransitionRepository.findByWorkflowIdAndSourceStepIdAndTargetStepId(
+                workflowId, currentStepId, invalidTargetStepId))
+                .thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> alertService.changeStep(alertId, invalidTargetStepId, "TEST_USER"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid step transition");
+
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(workflowTransitionRepository).findByWorkflowIdAndSourceStepIdAndTargetStepId(
+                workflowId, currentStepId, invalidTargetStepId);
+    }
+
+    @Test
+    @DisplayName("Should handle workflow assignment validation")
+    void validateWorkflowAssignment_ValidAssignment_AllowsAssignment() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String userId = "TEST_USER";
+        Long stepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        Step mockStep = new Step();
+        mockStep.setWorkflowStepId(stepId);
+        mockStep.setLabel("Ready");
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(stepRepository.findByWorkflowStepId(stepId)).thenReturn(Optional.of(mockStep));
+
+        // When
+        Alert result = alertService.changeStep(alertId, stepId, userId);
+
+        // Then
+        assertThat(result).isNotNull();
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(stepRepository).findByWorkflowStepId(stepId);
+    }
+
+    @Test
+    @DisplayName("Should get workflow steps for alert type")
+    void getWorkflowSteps_ValidAlertType_ReturnsSteps() {
+        // Given
+        String alertTypeId = AlertTestDataFactory.DEFAULT_ALERT_TYPE_ID;
+        Long workflowId = Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID);
+
+        Step step1 = new Step();
+        step1.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        step1.setLabel("Ready");
+        step1.setWorkflowId(workflowId);
+
+        Step step2 = new Step();
+        step2.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+        step2.setLabel("Under Review");
+        step2.setWorkflowId(workflowId);
+
+        List<Step> mockSteps = Arrays.asList(step1, step2);
+
+        when(stepRepository.findByWorkflowId(workflowId)).thenReturn(mockSteps);
+
+        // When
+        List<Step> result = stepRepository.findByWorkflowId(workflowId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getLabel()).isIn("Ready", "Under Review");
+        assertThat(result.get(1).getLabel()).isIn("Ready", "Under Review");
+
+        verify(stepRepository).findByWorkflowId(workflowId);
+    }
+
+    @Test
+    @DisplayName("Should handle workflow step not found")
+    void getWorkflowStep_StepNotFound_ThrowsEntityNotFoundException() {
+        // Given
+        Long nonExistentStepId = 999L;
+        when(stepRepository.findByWorkflowStepId(nonExistentStepId)).thenReturn(Optional.empty());
+
+        // When & Then
+        Optional<Step> result = stepRepository.findByWorkflowStepId(nonExistentStepId);
+        assertThat(result).isEmpty();
+
+        verify(stepRepository).findByWorkflowStepId(nonExistentStepId);
+    }
+
+    @Test
+    @DisplayName("Should validate step permissions for user")
+    void validateStepPermissions_ValidUser_AllowsAccess() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String userId = "AUTHORIZED_USER";
+        Long stepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setOwnerId(userId); // User owns the alert
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+
+        // When
+        Alert result = alertService.changeStep(alertId, stepId, userId);
+
+        // Then
+        assertThat(result).isNotNull();
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+    }
+
+    @Test
+    @DisplayName("Should handle back step transitions")
+    void getBackStepTransitions_ValidAlert_ReturnsBackSteps() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setAlertStepId(AlertTestDataFactory.ALTERNATE_STEP_ID); // Currently at "Under Review"
+
+        Step currentStep = new Step();
+        currentStep.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+        currentStep.setLabel("Under Review");
+        currentStep.setWorkflowId(Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID));
+
+        // Mock back step (previous step)
+        Step backStep = new Step();
+        backStep.setWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        backStep.setLabel("Ready");
+
+        // Mock back transition
+        WorkflowTransitionEntity backTransition = new WorkflowTransitionEntity();
+        backTransition.setSourceStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+        backTransition.setTargetStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(stepRepository.findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID)))
+                .thenReturn(Optional.of(currentStep));
+        when(workflowTransitionRepository.findByWorkflowIdAndTargetStepId(
+                Long.valueOf(AlertTestDataFactory.DEFAULT_WORKFLOW_ID),
+                Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID)))
+                .thenReturn(Arrays.asList(backTransition));
+        when(stepRepository.findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID)))
+                .thenReturn(Optional.of(backStep));
+
+        // When
+        StepTransitionDTO result = alertService.getAlertStepTransitions(alertId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getCurrentStep()).isNotNull();
+        assertThat(result.getCurrentStep().getStepName()).isEqualTo("Under Review");
+        assertThat(result.getBackSteps()).isNotNull();
+        // Note: Back steps logic may vary based on implementation
+
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(stepRepository).findByWorkflowStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+    }
+
+    @Test
+    @DisplayName("Should handle step rollback operation")
+    void rollbackStep_ValidAlert_RollsBackToPreviousStep() {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String rollbackReason = "Need to review additional information";
+
+        AlertEntity mockAlert = AlertTestDataFactory.createTestAlertEntity();
+        mockAlert.setAlertStepId(AlertTestDataFactory.ALTERNATE_STEP_ID); // Currently at step 71
+
+        when(alertRepository.findAlertEntityByAlertId(alertId)).thenReturn(Optional.of(mockAlert));
+        when(alertRepository.createUpsertAlert(any(AlertEntity.class))).thenReturn(mockAlert);
+
+        // When
+        Alert result = alertService.rollbackStep(alertId, rollbackReason);
+
+        // Then
+        assertThat(result).isNotNull();
+        verify(alertRepository).findAlertEntityByAlertId(alertId);
+        verify(alertRepository).createUpsertAlert(any(AlertEntity.class));
+    }
+}

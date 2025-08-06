@@ -1,0 +1,422 @@
+package com.dair.cais.alerts;
+
+import com.dair.cais.alert.Alert;
+import com.dair.cais.alert.dto.BulkStepChangeRequest;
+import com.dair.cais.audit.AuditLogRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+/**
+ * Comprehensive end-to-end integration tests for Alert module workflow operations
+ * Following the established pattern from case module testing
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@DisplayName("Comprehensive Alert Workflow Integration Tests")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Transactional
+class ComprehensiveAlertWorkflowTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    // Store test alert ID for use across tests
+    private static String testAlertId;
+    private static String secondTestAlertId;
+    private static String thirdTestAlertId;
+
+    @Test
+    @Order(1)
+    @DisplayName("Setup: Create test alerts for workflow testing")
+    void setup_CreateTestAlerts() throws Exception {
+        log.info("Creating test alerts for comprehensive workflow testing");
+
+        // Create first test alert
+        Alert testAlert1 = AlertTestDataFactory.createTestAlert();
+        testAlert1.setAlertId("WORKFLOW_ALERT_1_" + System.currentTimeMillis());
+
+        MvcResult result1 = mockMvc.perform(post("/alerts/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(testAlert1)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(notNullValue())))
+                .andReturn();
+
+        Alert createdAlert1 = objectMapper.readValue(result1.getResponse().getContentAsString(), Alert.class);
+        testAlertId = createdAlert1.getAlertId();
+
+        // Create second test alert
+        Alert testAlert2 = AlertTestDataFactory.createTestAlert();
+        testAlert2.setAlertId("WORKFLOW_ALERT_2_" + System.currentTimeMillis());
+
+        MvcResult result2 = mockMvc.perform(post("/alerts/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(testAlert2)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Alert createdAlert2 = objectMapper.readValue(result2.getResponse().getContentAsString(), Alert.class);
+        secondTestAlertId = createdAlert2.getAlertId();
+
+        // Create third test alert
+        Alert testAlert3 = AlertTestDataFactory.createTestAlert();
+        testAlert3.setAlertId("WORKFLOW_ALERT_3_" + System.currentTimeMillis());
+
+        MvcResult result3 = mockMvc.perform(post("/alerts/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(testAlert3)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Alert createdAlert3 = objectMapper.readValue(result3.getResponse().getContentAsString(), Alert.class);
+        thirdTestAlertId = createdAlert3.getAlertId();
+
+        assertThat(testAlertId).isNotNull();
+        assertThat(secondTestAlertId).isNotNull();
+        assertThat(thirdTestAlertId).isNotNull();
+
+        log.info("Test alerts created: {}, {}, {}", testAlertId, secondTestAlertId, thirdTestAlertId);
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("Workflow: Get alert step transitions")
+    void workflow_GetStepTransitions_ReturnsAvailableSteps() throws Exception {
+        log.info("Testing alert step transitions for alertId: {}", testAlertId);
+
+        mockMvc.perform(get("/alerts/{alertId}/step-transitions", testAlertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStep", is(notNullValue())))
+                .andExpect(jsonPath("$.nextSteps", is(notNullValue())))
+                .andExpect(jsonPath("$.backSteps", is(notNullValue())));
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("Workflow: Single alert step change")
+    void workflow_ChangeAlertStep_UpdatesStepSuccessfully() throws Exception {
+        log.info("Testing single alert step change for alertId: {}", testAlertId);
+
+        Long newStepId = Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID);
+        String userId = "TEST_WORKFLOW_USER";
+
+        mockMvc.perform(patch("/alerts/changestep/{alertId}", testAlertId)
+                        .param("stepId", newStepId.toString())
+                        .param("userId", userId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)))
+                .andExpect(jsonPath("$.alertStepId", is(AlertTestDataFactory.ALTERNATE_STEP_ID)));
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("Workflow: Bulk alert step change")
+    void workflow_BulkAlertStepChange_UpdatesMultipleAlerts() throws Exception {
+        log.info("Testing bulk alert step change for multiple alerts");
+
+        List<String> alertIds = Arrays.asList(testAlertId, secondTestAlertId, thirdTestAlertId);
+        Long stepId = Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID);
+        BulkStepChangeRequest request = AlertTestDataFactory.createBulkAlertStepChangeRequest(alertIds, stepId);
+
+        mockMvc.perform(post("/alerts/bulk/step-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.successCount", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.failureCount", greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.successfulAlerts", is(notNullValue())));
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("Workflow: Alert score update")
+    void workflow_UpdateAlertScore_UpdatesScoreSuccessfully() throws Exception {
+        log.info("Testing alert score update for alertId: {}", testAlertId);
+
+        int newScore = 95;
+
+        mockMvc.perform(patch("/alerts/changescore/{alertId}", testAlertId)
+                        .param("totalScore", String.valueOf(newScore))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)))
+                .andExpect(jsonPath("$.totalScore", is(newScore)));
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("Workflow: Alert owner change")
+    void workflow_ChangeAlertOwner_UpdatesOwnerSuccessfully() throws Exception {
+        log.info("Testing alert owner change for alertId: {}", testAlertId);
+
+        String newOwnerId = "NEW_WORKFLOW_OWNER";
+
+        mockMvc.perform(patch("/alerts/changeowner/{alertId}", testAlertId)
+                        .param("ownerId", newOwnerId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)))
+                .andExpect(jsonPath("$.ownerId", is(newOwnerId)));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("Workflow: Alert organization update")
+    void workflow_UpdateAlertOrganization_UpdatesOrgSuccessfully() throws Exception {
+        log.info("Testing alert organization update for alertId: {}", testAlertId);
+
+        String newOrgUnitId = "NEW_ORG_UNIT";
+
+        mockMvc.perform(patch("/alerts/changeorg/{alertId}", testAlertId)
+                        .param("orgUnitId", newOrgUnitId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)))
+                .andExpect(jsonPath("$.orgUnitId", is(newOrgUnitId)));
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("Workflow: Alert patch update")
+    void workflow_PatchAlert_UpdatesAlertData() throws Exception {
+        log.info("Testing alert patch update for alertId: {}", testAlertId);
+
+        Alert updateAlert = AlertTestDataFactory.createTestAlertForUpdate();
+        String alertType = "account-review";
+
+        mockMvc.perform(patch("/alerts/{alertId}", testAlertId)
+                        .param("alertType", alertType)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateAlert)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)));
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("Workflow: Alert retrieval after updates")
+    void workflow_RetrieveUpdatedAlert_ReturnsCurrentState() throws Exception {
+        log.info("Testing alert retrieval after updates for alertId: {}", testAlertId);
+
+        mockMvc.perform(get("/alerts/alertId/{alertId}", testAlertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(testAlertId)))
+                .andExpect(jsonPath("$.isActive", is(true)));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("Audit: Alert operations with audit logging")
+    void audit_AlertOperationsWithAudit_LogsAuditTrail() throws Exception {
+        log.info("Testing alert operations with audit logging");
+
+        AuditLogRequest auditRequest = AlertTestDataFactory.createAuditLogRequest();
+        Long stepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+
+        // Test step change with audit
+        mockMvc.perform(patch("/alerts/audit/changestep/{alertId}", secondTestAlertId)
+                        .param("stepId", stepId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(auditRequest)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(secondTestAlertId)));
+
+        // Test score change with audit
+        int newScore = 88;
+        mockMvc.perform(patch("/alerts/audit/changescore/{alertId}", secondTestAlertId)
+                        .param("totalScore", String.valueOf(newScore))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(auditRequest)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalScore", is(newScore)));
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("Search: Get all active alerts")
+    void search_GetAllActiveAlerts_ReturnsActiveAlerts() throws Exception {
+        log.info("Testing retrieval of all active alerts");
+
+        mockMvc.perform(get("/alerts/active")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", is(notNullValue())))
+                .andExpect(jsonPath("$[*].isActive", everyItem(is(true))));
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("Search: Get alerts with pagination")
+    void search_GetAlertsWithPagination_ReturnsPagedResults() throws Exception {
+        log.info("Testing alert search with pagination");
+
+        mockMvc.perform(get("/alerts")
+                        .param("limit", "10")
+                        .param("offset", "0")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", is(notNullValue())));
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("Error Handling: Invalid alert operations")
+    void errorHandling_InvalidOperations_ReturnsErrorResponses() throws Exception {
+        log.info("Testing error handling for invalid alert operations");
+
+        String nonExistentAlertId = "NON_EXISTENT_ALERT_ID";
+
+        // Test retrieving non-existent alert
+        mockMvc.perform(get("/alerts/alertId/{alertId}", nonExistentAlertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound());
+
+        // Test step change on non-existent alert
+        mockMvc.perform(patch("/alerts/changestep/{alertId}", nonExistentAlertId)
+                        .param("stepId", "71")
+                        .param("userId", "TEST_USER")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("Bulk Operations: Bulk step change with mixed results")
+    void bulkOperations_MixedResults_HandlesPartialFailures() throws Exception {
+        log.info("Testing bulk operations with mixed success/failure results");
+
+        List<String> mixedAlertIds = Arrays.asList(
+                testAlertId,                    // Should succeed
+                "NON_EXISTENT_ALERT_1",        // Should fail
+                secondTestAlertId,              // Should succeed
+                "NON_EXISTENT_ALERT_2"         // Should fail
+        );
+
+        Long stepId = Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID);
+        BulkStepChangeRequest request = AlertTestDataFactory.createBulkAlertStepChangeRequest(mixedAlertIds, stepId);
+
+        mockMvc.perform(post("/alerts/bulk/step-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.successCount", greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.failureCount", greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.successfulAlerts", is(notNullValue())))
+                .andExpect(jsonPath("$.failures", is(notNullValue())));
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("Performance: Bulk operations with large dataset")
+    void performance_BulkOperationsLargeDataset_CompletesWithinTimeLimit() throws Exception {
+        log.info("Testing performance of bulk operations with larger dataset");
+
+        // Create a list of alert IDs for bulk testing
+        List<String> bulkAlertIds = Arrays.asList(testAlertId, secondTestAlertId, thirdTestAlertId);
+        Long stepId = Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID);
+        BulkStepChangeRequest request = AlertTestDataFactory.createBulkAlertStepChangeRequest(bulkAlertIds, stepId);
+
+        long startTime = System.currentTimeMillis();
+
+        mockMvc.perform(post("/alerts/bulk/step-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk());
+
+        long endTime = System.currentTimeMillis();
+        long executionTime = endTime - startTime;
+
+        log.info("Bulk operation completed in {} ms", executionTime);
+        
+        // Assert reasonable performance (should complete within 30 seconds for test data)
+        assertThat(executionTime).isLessThan(30000L);
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("Cleanup: Delete test alerts")
+    void cleanup_DeleteTestAlerts() throws Exception {
+        log.info("Cleaning up test alerts");
+
+        String alertType = "account-review";
+
+        // Delete first test alert
+        if (testAlertId != null) {
+            mockMvc.perform(delete("/alerts/{alertId}", testAlertId)
+                            .param("alertType", alertType)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isNoContent());
+        }
+
+        // Delete second test alert
+        if (secondTestAlertId != null) {
+            mockMvc.perform(delete("/alerts/{alertId}", secondTestAlertId)
+                            .param("alertType", alertType)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isNoContent());
+        }
+
+        // Delete third test alert
+        if (thirdTestAlertId != null) {
+            mockMvc.perform(delete("/alerts/{alertId}", thirdTestAlertId)
+                            .param("alertType", alertType)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isNoContent());
+        }
+
+        log.info("Test alert cleanup completed");
+    }
+
+    /**
+     * Helper method for logging test progress
+     */
+    private void log(String message, Object... args) {
+        System.out.printf("[ALERT_TEST] " + message + "%n", args);
+    }
+}

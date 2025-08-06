@@ -20,23 +20,26 @@ spring:
       uri: mongodb://localhost:27017/test_db  # Local only
       database: test_db
       
+  # Test profiles
+  profiles:
+    active: test
+    
   # Disable security for tests
   security:
     enabled: false
     
-  # Logging configuration
+  # Logging
   logging:
     level:
-      com.dair.cais: DEBUG
-      org.springframework.web: DEBUG
-      org.springframework.test: DEBUG
+      com.dair.cais: WARN  # Reduce noise
+      org.springframework: WARN
       
-# Test specific configurations
+# Test specific configurations  
 test:
   data:
-    cleanup: true
+    cleanup: true  # Safe because it's in-memory
     
-# Disable unnecessary features for tests
+# Disable management endpoints
 management:
   endpoints:
     enabled: false

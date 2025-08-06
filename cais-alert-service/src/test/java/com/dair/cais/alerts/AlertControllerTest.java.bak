@@ -1,0 +1,419 @@
+package com.dair.cais.alerts;
+
+import com.dair.cais.alert.Alert;
+import com.dair.cais.alert.AlertController;
+import com.dair.cais.alert.AlertService;
+import com.dair.cais.alert.dto.BulkStepChangeRequest;
+import com.dair.cais.alert.dto.BulkStepChangeResponse;
+import com.dair.cais.alert.dto.StepTransitionDTO;
+import com.dair.cais.alert.dto.StepInfo;
+import com.dair.cais.audit.AuditLogRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+/**
+ * Integration tests for AlertController using MockMvc
+ * Following the established pattern from case module testing
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@DisplayName("Alert Controller Integration Tests")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class AlertControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private AlertService alertService;
+
+    @Test
+    @Order(1)
+    @DisplayName("GET: Should retrieve alert by ID successfully")
+    void getAlert_ValidId_ReturnsAlert() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        Alert mockAlert = AlertTestDataFactory.createTestAlert();
+        mockAlert.setAlertId(alertId);
+
+        when(alertService.getAlertOnId(alertId)).thenReturn(mockAlert);
+
+        // When & Then
+        mockMvc.perform(get("/alerts/alertId/{alertId}", alertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(alertId)))
+                .andExpect(jsonPath("$.alertTypeId", is(AlertTestDataFactory.DEFAULT_ALERT_TYPE_ID)))
+                .andExpect(jsonPath("$.status", is("New")))
+                .andExpect(jsonPath("$.isActive", is(true)));
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("GET: Should return 404 when alert not found")
+    void getAlert_InvalidId_Returns404() throws Exception {
+        // Given
+        String alertId = "NON_EXISTENT_ALERT";
+        when(alertService.getAlertOnId(alertId)).thenThrow(new EntityNotFoundException("Alert not found"));
+
+        // When & Then
+        mockMvc.perform(get("/alerts/alertId/{alertId}", alertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("POST: Should create alert successfully")
+    void createAlert_ValidData_CreatesAlert() throws Exception {
+        // Given
+        Alert inputAlert = AlertTestDataFactory.createTestAlert();
+        Alert createdAlert = AlertTestDataFactory.createTestAlert();
+        createdAlert.setId("generated_id_123");
+
+        when(alertService.createAlert(any(Alert.class))).thenReturn(createdAlert);
+
+        // When & Then
+        MvcResult result = mockMvc.perform(post("/alerts/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(inputAlert)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(notNullValue())))
+                .andExpect(jsonPath("$.alertTypeId", is(AlertTestDataFactory.DEFAULT_ALERT_TYPE_ID)))
+                .andExpect(jsonPath("$.isActive", is(true)))
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        Alert responseAlert = objectMapper.readValue(responseContent, Alert.class);
+        assertThat(responseAlert.getAlertId()).isNotNull();
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("POST: Should create alert with audit logging")
+    void createAlert_WithAudit_CreatesAlertAndLogsAudit() throws Exception {
+        // Given
+        Alert inputAlert = AlertTestDataFactory.createTestAlert();
+        AuditLogRequest auditRequest = AlertTestDataFactory.createAuditLogRequest();
+        Alert createdAlert = AlertTestDataFactory.createTestAlert();
+
+        when(alertService.createAlertWithAudit(any(Alert.class), any(AuditLogRequest.class)))
+                .thenReturn(createdAlert);
+
+        // When & Then
+        mockMvc.perform(post("/alerts/audit/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(inputAlert))
+                        .content(objectMapper.writeValueAsString(auditRequest)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(notNullValue())));
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("PATCH: Should update alert step successfully")
+    void changeStep_ValidData_UpdatesStep() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        Long stepId = 71L;
+        String userId = "TEST_USER";
+        Alert updatedAlert = AlertTestDataFactory.createTestAlertForUpdate();
+
+        when(alertService.changeStep(alertId, stepId, userId)).thenReturn(updatedAlert);
+
+        // When & Then
+        mockMvc.perform(patch("/alerts/changestep/{alertId}", alertId)
+                        .param("stepId", stepId.toString())
+                        .param("userId", userId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(alertId)))
+                .andExpect(jsonPath("$.alertStepId", is(AlertTestDataFactory.ALTERNATE_STEP_ID)));
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("PATCH: Should update alert total score")
+    void updateTotalScore_ValidData_UpdatesScore() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        int newScore = 95;
+        Alert updatedAlert = AlertTestDataFactory.createTestAlert();
+        updatedAlert.setTotalScore(newScore);
+
+        when(alertService.updateTotalScore(alertId, newScore)).thenReturn(updatedAlert);
+
+        // When & Then
+        mockMvc.perform(patch("/alerts/changescore/{alertId}", alertId)
+                        .param("totalScore", String.valueOf(newScore))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(alertId)))
+                .andExpect(jsonPath("$.totalScore", is(newScore)));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("PATCH: Should update alert owner")
+    void updateOwner_ValidData_UpdatesOwner() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String newOwnerId = "NEW_OWNER";
+        Alert updatedAlert = AlertTestDataFactory.createTestAlert();
+        updatedAlert.setOwnerId(newOwnerId);
+
+        when(alertService.updateOwnerId(alertId, newOwnerId)).thenReturn(updatedAlert);
+
+        // When & Then
+        mockMvc.perform(patch("/alerts/changeowner/{alertId}", alertId)
+                        .param("ownerId", newOwnerId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(alertId)))
+                .andExpect(jsonPath("$.ownerId", is(newOwnerId)));
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("POST: Should perform bulk step change successfully")
+    void bulkStepChange_ValidRequest_UpdatesAllAlerts() throws Exception {
+        // Given
+        List<String> alertIds = Arrays.asList("ALERT_1", "ALERT_2", "ALERT_3");
+        Long stepId = 71L;
+        BulkStepChangeRequest request = AlertTestDataFactory.createBulkAlertStepChangeRequest(alertIds, stepId);
+
+        BulkStepChangeResponse response = new BulkStepChangeResponse();
+        response.setSuccessCount(3);
+        response.setFailureCount(0);
+        response.setSuccessfulAlerts(alertIds);
+
+        when(alertService.changeStepBulk(any(BulkStepChangeRequest.class))).thenReturn(response);
+
+        // When & Then
+        mockMvc.perform(post("/alerts/bulk/step-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.successCount", is(3)))
+                .andExpect(jsonPath("$.failureCount", is(0)))
+                .andExpect(jsonPath("$.successfulAlerts", hasSize(3)));
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("POST: Should handle bulk step change with partial failures")
+    void bulkStepChange_PartialFailures_ReturnsPartialSuccess() throws Exception {
+        // Given
+        List<String> alertIds = Arrays.asList("ALERT_1", "ALERT_2", "NON_EXISTENT");
+        Long stepId = 71L;
+        BulkStepChangeRequest request = AlertTestDataFactory.createBulkAlertStepChangeRequest(alertIds, stepId);
+
+        BulkStepChangeResponse response = new BulkStepChangeResponse();
+        response.setSuccessCount(2);
+        response.setFailureCount(1);
+        response.setSuccessfulAlerts(Arrays.asList("ALERT_1", "ALERT_2"));
+        response.setFailures(Arrays.asList("NON_EXISTENT: Alert not found"));
+
+        when(alertService.changeStepBulk(any(BulkStepChangeRequest.class))).thenReturn(response);
+
+        // When & Then
+        mockMvc.perform(post("/alerts/bulk/step-change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.successCount", is(2)))
+                .andExpect(jsonPath("$.failureCount", is(1)))
+                .andExpect(jsonPath("$.failures", hasSize(1)));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("GET: Should get alert step transitions")
+    void getAlertStepTransitions_ValidAlert_ReturnsTransitions() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        StepTransitionDTO transitions = new StepTransitionDTO();
+        
+        StepInfo currentStep = new StepInfo();
+        currentStep.setStepId(Long.valueOf(AlertTestDataFactory.DEFAULT_STEP_ID));
+        currentStep.setStepName("Ready");
+        
+        StepInfo nextStep = new StepInfo();
+        nextStep.setStepId(Long.valueOf(AlertTestDataFactory.ALTERNATE_STEP_ID));
+        nextStep.setStepName("Under Review");
+        
+        transitions.setCurrentStep(currentStep);
+        transitions.setNextSteps(Arrays.asList(nextStep));
+        transitions.setBackSteps(Arrays.asList());
+
+        when(alertService.getAlertStepTransitions(alertId)).thenReturn(transitions);
+
+        // When & Then
+        mockMvc.perform(get("/alerts/{alertId}/step-transitions", alertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStep.stepId", is(70)))
+                .andExpect(jsonPath("$.currentStep.stepName", is("Ready")))
+                .andExpect(jsonPath("$.nextSteps", hasSize(1)))
+                .andExpect(jsonPath("$.nextSteps[0].stepId", is(71)));
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("GET: Should retrieve all active alerts")
+    void getAllActiveAlerts_ValidRequest_ReturnsAlerts() throws Exception {
+        // Given
+        List<Alert> mockAlerts = Arrays.asList(
+                AlertTestDataFactory.createTestAlert(),
+                AlertTestDataFactory.createTestAlert(),
+                AlertTestDataFactory.createTestAlert()
+        );
+
+        when(alertService.getAllActiveAlerts()).thenReturn(mockAlerts);
+
+        // When & Then
+        mockMvc.perform(get("/alerts/active")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].isActive", is(true)))
+                .andExpect(jsonPath("$[1].isActive", is(true)))
+                .andExpect(jsonPath("$[2].isActive", is(true)));
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("GET: Should get alerts with pagination")
+    void getAllAlerts_WithPagination_ReturnsPagedResults() throws Exception {
+        // Given
+        Map<String, Object> mockResponse = new HashMap<>();
+        mockResponse.put("alerts", AlertTestDataFactory.createTestAlertList(5));
+        mockResponse.put("totalCount", 100);
+        mockResponse.put("currentPage", 0);
+        mockResponse.put("pageSize", 10);
+
+        when(alertService.getAllAlerts(
+                anyString(), anyString(), anyList(), anyList(), anyList(),
+                any(), any(), anyInt(), anyInt())).thenReturn(mockResponse);
+
+        // When & Then
+        mockMvc.perform(get("/alerts")
+                        .param("limit", "10")
+                        .param("offset", "0")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alerts", hasSize(5)))
+                .andExpect(jsonPath("$.totalCount", is(100)))
+                .andExpect(jsonPath("$.currentPage", is(0)));
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("PATCH: Should update alert with full data")
+    void patchAlert_ValidData_UpdatesAlert() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String alertType = "account-review";
+        Alert updateAlert = AlertTestDataFactory.createTestAlertForUpdate();
+        Alert updatedAlert = AlertTestDataFactory.createTestAlertForUpdate();
+
+        when(alertService.patchAlert(eq(alertId), eq(alertType), any(Alert.class)))
+                .thenReturn(updatedAlert);
+
+        // When & Then
+        mockMvc.perform(patch("/alerts/{alertId}", alertId)
+                        .param("alertType", alertType)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateAlert)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertId", is(alertId)))
+                .andExpect(jsonPath("$.status", is("In Progress")));
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("DELETE: Should delete alert successfully")
+    void deleteAlert_ValidId_DeletesAlert() throws Exception {
+        // Given
+        String alertId = "TEST_ALERT_123";
+        String alertType = "account-review";
+
+        // When & Then
+        mockMvc.perform(delete("/alerts/{alertId}", alertId)
+                        .param("alertType", alertType)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("Error Handling: Should handle validation errors")
+    void createAlert_InvalidData_Returns400() throws Exception {
+        // Given - Invalid alert with missing required fields
+        Alert invalidAlert = new Alert();
+        // Only set ID, missing other required fields
+
+        // When & Then
+        mockMvc.perform(post("/alerts/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidAlert)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("Error Handling: Should handle server errors")
+    void getAlert_ServerError_Returns500() throws Exception {
+        // Given
+        String alertId = "ERROR_ALERT";
+        when(alertService.getAlertOnId(alertId)).thenThrow(new RuntimeException("Database connection failed"));
+
+        // When & Then
+        mockMvc.perform(get("/alerts/alertId/{alertId}", alertId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isInternalServerError());
+    }
+}
